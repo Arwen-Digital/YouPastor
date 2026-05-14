@@ -10,6 +10,7 @@ export const upsert = mutation({
     averageAttendance: v.optional(v.string()),
     location: v.optional(v.string()),
     bibleTranslation: v.optional(v.string()),
+    onboardingComplete: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
@@ -33,6 +34,7 @@ export const upsert = mutation({
       averageAttendance: args.averageAttendance,
       location: args.location,
       bibleTranslation: args.bibleTranslation,
+      onboardingComplete: args.onboardingComplete,
       creditBalance: 100,
     })
   },

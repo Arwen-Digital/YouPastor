@@ -9,6 +9,12 @@ const routes = [
     meta: { public: true },
   },
   {
+    path: '/onboarding',
+    name: 'onboarding',
+    component: () => import('@/pages/OnboardingPage.vue'),
+    meta: { requiresAuth: true, onboarding: true },
+  },
+  {
     path: '/',
     component: () => import('@/layouts/AppLayout.vue'),
     meta: { requiresAuth: true },
@@ -68,6 +74,7 @@ router.beforeEach((to, _from, next) => {
 
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true)
   const isPublic = to.matched.some((record) => record.meta.public === true)
+  const isOnboarding = to.matched.some((record) => record.meta.onboarding === true)
 
   // Route requires auth but user is not authenticated → login
   if (requiresAuth && !auth.isAuthenticated) {
@@ -75,8 +82,25 @@ router.beforeEach((to, _from, next) => {
     return
   }
 
-  // Public route (login) but user IS authenticated → home
+  // Public route (login) but user IS authenticated
   if (isPublic && auth.isAuthenticated && to.name === 'login') {
+    // If they need onboarding, go there; otherwise home
+    if (auth.user?.needsOnboarding) {
+      next('/onboarding')
+    } else {
+      next('/')
+    }
+    return
+  }
+
+  // Authenticated user who needs onboarding — force to onboarding unless already there
+  if (auth.isAuthenticated && auth.user?.needsOnboarding && !isOnboarding) {
+    next('/onboarding')
+    return
+  }
+
+  // Authenticated user who does NOT need onboarding — don't let them back into onboarding
+  if (auth.isAuthenticated && !auth.user?.needsOnboarding && isOnboarding) {
     next('/')
     return
   }

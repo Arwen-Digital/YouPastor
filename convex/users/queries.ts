@@ -15,12 +15,15 @@ export const getMe = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first()
 
+    const needsOnboarding = !profile?.onboardingComplete
+
     return {
       _id: userId,
       email: authUser.email,
       name: profile?.pastorName ?? authUser.name ?? "",
       creditBalance: profile?.creditBalance ?? 0,
       hasProfile: !!profile,
+      needsOnboarding,
     }
   },
 })

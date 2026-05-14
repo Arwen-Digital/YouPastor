@@ -14,6 +14,7 @@ export default defineSchema({
     averageAttendance: v.optional(v.string()),
     location: v.optional(v.string()),
     bibleTranslation: v.optional(v.string()),
+    onboardingComplete: v.optional(v.boolean()),
     creditBalance: v.number(),
   })
     .index("by_user", ["userId"]),

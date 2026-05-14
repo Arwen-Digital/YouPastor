@@ -8,6 +8,7 @@ export interface AuthUser {
   name: string
   creditBalance: number
   hasProfile: boolean
+  needsOnboarding: boolean
 }
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
@@ -38,6 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
       name: name ?? 'Pastor Arnold',
       creditBalance: 100,
       hasProfile: true,
+      needsOnboarding: false,
     }
     isAuthenticated.value = true
   }
@@ -214,6 +216,12 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  function markOnboardingComplete() {
+    if (user.value) {
+      user.value = { ...user.value, needsOnboarding: false }
+    }
+  }
+
   return {
     user,
     isAuthenticated,
@@ -226,6 +234,7 @@ export const useAuthStore = defineStore('auth', () => {
     signOut,
     fetchUser,
     clearError,
+    markOnboardingComplete,
   }
 })
 

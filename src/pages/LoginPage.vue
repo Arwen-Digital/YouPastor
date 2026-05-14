@@ -90,7 +90,11 @@ async function handleSubmit() {
   }
 
   if (success) {
-    router.push('/')
+    if (mode.value === 'signup') {
+      router.push('/onboarding')
+    } else {
+      router.push('/')
+    }
   }
 }
 
