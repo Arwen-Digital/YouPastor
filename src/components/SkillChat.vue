@@ -8,8 +8,10 @@ import { buildSystemPrompt, buildContextBlock, type ChurchContext } from '@/lib/
 import { useConvexQuery } from '@/composables/useConvexQuery'
 import { useSaveSeries } from '@/composables/useSaveSeries'
 import { useSaveResearch } from '@/composables/useSaveResearch'
+import { useSaveBrainstorm } from '@/composables/useSaveBrainstorm'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
+import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -33,6 +35,31 @@ Example RESEARCH_READY messages:
 
 NEVER produce research output, commentary, word studies, or sermon content yourself. Your only job is intake.`
 
+const BRAINSTORM_INTAKE_PROMPT = `You are a conversational intake assistant for the Sermon Brainstorm skill.
+
+Your goal is to help the pastor think through their sermon by asking questions one at a time. Draw from this question sequence, adapting based on what the pastor says:
+
+1. What passage or topic are you working with?
+2. What's the one thing that jumped out at you when you first read this text?
+3. What's your congregation wrestling with right now that this passage speaks to?
+4. When you imagine the person in the third row who needs this sermon most, who are they and what are they carrying?
+5. If people only remember one sentence from this sermon on Monday morning, what do you want it to be?
+6. What's the tension in this text? Where does it push back against what people assume?
+7. How does this passage point to the gospel? Where's the good news?
+8. Is there something in this text that makes you uncomfortable or that you'd rather skip?
+9. What do you want people to DO differently after hearing this?
+
+Instructions:
+- Ask ONE question at a time. Wait for the pastor's response before asking the next.
+- Skip questions the pastor has already answered.
+- If an answer is thin, ask a brief follow-up before moving on.
+- After 5-7 exchanges or when the picture is clear, respond with a message that starts exactly with "BRIEF_READY:" followed by a short summary.
+
+Example BRIEF_READY: "BRIEF_READY: Passage: John 11:1-44. Big idea: Jesus weeps with us before He delivers us."
+
+The pastor's church context is already provided in the system. Do NOT ask for it.
+NEVER produce the sermon brief yourself. Your only job is intake.`
+
 const RESEARCHER_HANDOFF_NOTE = `\n\nIMPORTANT: The conversation below already contains the pastor's passage and context (marked by RESEARCH_READY). Do not ask follow-up questions. Produce the full 7-section research output immediately based on the information shared.`
 
 const props = defineProps<{
@@ -51,7 +78,8 @@ const { isLoading, streamingContent, error, streamMessage, sendMessage, citation
 // Determine which save flow to use based on skill
 const isSeriesPlanner = props.skillSlug === 'sermon-series'
 const isSermonResearch = props.skillSlug === 'sermon-research'
-const canShowSave = isSeriesPlanner || isSermonResearch
+const isSermonBrainstorm = props.skillSlug === 'sermon-brainstorm'
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm
 
 // Series save flow
 const {
@@ -74,6 +102,17 @@ const {
   save: confirmSaveResearch,
   reset: resetResearchSave,
 } = useSaveResearch()
+
+// Brainstorm save flow
+const {
+  status: brainstormSaveStatus,
+  preview: brainstormPreview,
+  error: brainstormSaveError,
+  savedBriefId,
+  extract: extractBrainstorm,
+  save: confirmSaveBrainstorm,
+  reset: resetBrainstormSave,
+} = useSaveBrainstorm()
 
 const showSaveModal = ref(false)
 
@@ -110,20 +149,38 @@ const intakePrompt = computed(() => {
     : ''
   return ctxBlock ? `${INTAKE_PROMPT_BASE}\n\n---\n\n${ctxBlock}` : INTAKE_PROMPT_BASE
 })
-const currentSystemPrompt = ref(isSermonResearch ? intakePrompt.value : baseSystemPrompt.value)
+const brainstormIntakePrompt = computed(() => {
+  const ctx = churchContext.value
+  const ctxBlock = (ctx.churchName || ctx.pastorName)
+    ? buildContextBlock(ctx)
+    : ''
+  return ctxBlock ? `${BRAINSTORM_INTAKE_PROMPT}\n\n---\n\n${ctxBlock}` : BRAINSTORM_INTAKE_PROMPT
+})
+const currentSystemPrompt = ref(
+  isSermonResearch ? intakePrompt.value
+  : isSermonBrainstorm ? brainstormIntakePrompt.value
+  : baseSystemPrompt.value
+)
 
 // Update system prompt when church profile loads or changes
 watch(baseSystemPrompt, (newPrompt) => {
   // Only update if we're past the intake phase (not using intake prompt anymore)
-  if (role.value !== 'orchestrator' || !isSermonResearch) {
+  if (role.value !== 'orchestrator' || (!isSermonResearch && !isSermonBrainstorm)) {
     currentSystemPrompt.value = newPrompt
   }
 })
 
 // Update intake prompt when church profile loads
 watch(intakePrompt, (newPrompt) => {
-  // Only update if we're still in intake phase
+  // Only update if we're still in research intake phase
   if (role.value === 'orchestrator' && isSermonResearch) {
+    currentSystemPrompt.value = newPrompt
+  }
+})
+
+// Update brainstorm intake prompt when church profile loads
+watch(brainstormIntakePrompt, (newPrompt) => {
+  if (role.value === 'orchestrator' && isSermonBrainstorm) {
     currentSystemPrompt.value = newPrompt
   }
 })
@@ -132,12 +189,12 @@ watch(intakePrompt, (newPrompt) => {
 const canSave = computed(() => {
   if (!canShowSave) return false
   if (isLoading.value) return false
-  const status = isSeriesPlanner ? seriesSaveStatus.value : researchSaveStatus.value
+  const status = isSeriesPlanner ? seriesSaveStatus.value : isSermonBrainstorm ? brainstormSaveStatus.value : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
-  // Research needs at least the RESEARCH_READY + research output (2 assistant msgs)
+  // Research and brainstorm need at least 2 assistant msgs (intake + brief)
   // Series planner needs more back-and-forth (6 assistant msgs)
-  const threshold = isSermonResearch ? 2 : 6
+  const threshold = isSeriesPlanner ? 6 : 2
   return assistantMsgs >= threshold
 })
 
@@ -186,6 +243,11 @@ onMounted(async () => {
     if (isSermonResearch && role.value === 'orchestrator' && result.content.includes('RESEARCH_READY:')) {
       await handoffToResearcher()
     }
+
+    // Detect brainstorm handoff and generate the brief
+    if (isSermonBrainstorm && role.value === 'orchestrator' && result.content.includes('BRIEF_READY:')) {
+      await handoffToBriefGenerator()
+    }
   }
 
   scrollToBottom()
@@ -198,6 +260,31 @@ async function handoffToResearcher() {
 
   // Add a user message to trigger the researcher response
   const triggerMsg = 'Please pull together the full research output for me.'
+  messages.value.push({ role: 'user', content: triggerMsg })
+  scrollToBottom()
+
+  const chatHistory: ChatMessage[] = [
+    { role: 'system', content: currentSystemPrompt.value },
+    ...messages.value,
+  ]
+
+  await streamMessage(chatHistory as any)
+
+  if (streamingContent.value) {
+    messages.value.push({ role: 'assistant', content: streamingContent.value })
+  }
+
+  scrollToBottom()
+}
+
+/** Switch from orchestrator intake to brief generation for sermon brainstorm */
+async function handoffToBriefGenerator() {
+  // Brainstorm doesn't need a model switch — orchestrator handles both phases.
+  // Just swap the system prompt to the full skill prompt.
+  currentSystemPrompt.value = baseSystemPrompt.value
+
+  // Add a user message to trigger the brief generation
+  const triggerMsg = 'Please generate the Expanded Sermon Brief now.'
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
@@ -238,6 +325,11 @@ async function handleSend() {
     if (isSermonResearch && role.value === 'orchestrator' && responseContent.includes('RESEARCH_READY:')) {
       await handoffToResearcher()
     }
+
+    // Detect brainstorm intake handoff and generate the brief
+    if (isSermonBrainstorm && role.value === 'orchestrator' && responseContent.includes('BRIEF_READY:')) {
+      await handoffToBriefGenerator()
+    }
   }
 }
 
@@ -247,6 +339,7 @@ async function handleSaveClick() {
   // Reset any previous error state
   if (isSeriesPlanner) resetSeriesSave()
   if (isSermonResearch) resetResearchSave()
+  if (isSermonBrainstorm) resetBrainstormSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -258,6 +351,8 @@ async function handleSaveClick() {
     await extractSeries(extractionMessages as any, role.value)
   } else if (isSermonResearch) {
     await extractResearch(extractionMessages as any, role.value)
+  } else if (isSermonBrainstorm) {
+    await extractBrainstorm(extractionMessages as any)
   }
 }
 
@@ -267,6 +362,10 @@ function handleSaveConfirmSeries(data: any) {
 
 function handleSaveConfirmResearch(data: any) {
   confirmSaveResearch(data)
+}
+
+function handleSaveConfirmBrainstorm(data: any) {
+  confirmSaveBrainstorm(data)
 }
 
 function handleSaveModalClose() {
@@ -279,11 +378,18 @@ function handleSaveModalClose() {
     const noteId = savedNoteId.value
     resetResearchSave()
     router.push(`/notebook/research/${noteId}`)
+  } else if (isSermonBrainstorm && brainstormSaveStatus.value === 'saved' && savedBriefId.value) {
+    const briefId = savedBriefId.value
+    resetBrainstormSave()
+    router.push(`/notebook/brainstorm/${briefId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
   } else if (researchSaveStatus.value === 'saved') {
     resetResearchSave()
+    router.push('/notebook')
+  } else if (brainstormSaveStatus.value === 'saved') {
+    resetBrainstormSave()
     router.push('/notebook')
   }
 }
@@ -430,6 +536,18 @@ function handleSaveModalClose() {
       :is-saving="researchSaveStatus === 'saving'"
       :saved-id="savedNoteId"
       @save="handleSaveConfirmResearch"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveBrainstormModal
+      v-if="showSaveModal && isSermonBrainstorm"
+      :save-status="brainstormSaveStatus"
+      :preview="brainstormPreview"
+      :save-error="brainstormSaveError"
+      :is-saving="brainstormSaveStatus === 'saving'"
+      :saved-id="savedBriefId"
+      @save="handleSaveConfirmBrainstorm"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />

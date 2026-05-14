@@ -102,6 +102,20 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]),
 
+  // Brainstorm session briefs — saved from the Sermon Brainstorm skill
+  brainstormBriefs: defineTable({
+    userId: v.id("users"),
+    passage: v.string(),
+    bigIdea: v.optional(v.string()),
+    seriesId: v.optional(v.id("series")),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_series", ["seriesId"]),
+
   agentWorkflows: defineTable({
     userId: v.id("users"),
     sermonId: v.optional(v.id("sermons")),

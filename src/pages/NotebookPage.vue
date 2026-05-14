@@ -12,14 +12,16 @@ const route = useRoute()
 
 // Which view: 'list', 'series', 'research'
 const view = computed(() => {
-  if (!route.params.id && !route.params.researchId) return 'list'
+  if (!route.params.id && !route.params.researchId && !route.params.brainstormId) return 'list'
   if (route.params.researchId) return 'research'
+  if (route.params.brainstormId) return 'brainstorm'
   if (route.params.id) return 'series'
   return 'list'
 })
 
 const selectedSeriesId = computed(() => route.params.id as string | undefined)
 const selectedResearchId = computed(() => route.params.researchId as string | undefined)
+const selectedBrainstormId = computed(() => route.params.brainstormId as string | undefined)
 
 // ── Series list ──
 const seriesList = ref<any[]>([])
@@ -29,6 +31,10 @@ let listUnsub: (() => void) | null = null
 // ── Research notes list ──
 const researchList = ref<any[]>([])
 let researchListUnsub: (() => void) | null = null
+
+// ── Brainstorm briefs list ──
+const brainstormList = ref<any[]>([])
+let brainstormListUnsub: (() => void) | null = null
 
 // ── Series detail ──
 const seriesDetail = ref<any>(null)
@@ -40,8 +46,13 @@ const researchDetail = ref<any>(null)
 const researchDetailLoading = ref(false)
 let researchDetailUnsub: (() => void) | null = null
 
+// ── Brainstorm detail ──
+const brainstormDetail = ref<any>(null)
+const brainstormDetailLoading = ref(false)
+let brainstormDetailUnsub: (() => void) | null = null
+
 // ── Active tab for list view ──
-const activeTab = ref<'series' | 'research'>('series')
+const activeTab = ref<'series' | 'research' | 'brainstorm'>('series')
 
 // ── Deleting ──
 const deletingId = ref<string | null>(null)
@@ -56,6 +67,9 @@ onMounted(async () => {
     researchListUnsub = client.onUpdate('research/queries:listMine' as any, {}, (data: any) => {
       researchList.value = data ?? []
     })
+    brainstormListUnsub = client.onUpdate('brainstorm/queries:listMine' as any, {}, (data: any) => {
+      brainstormList.value = data ?? []
+    })
   } catch (err) {
     console.error('Failed to load notebook:', err)
     listLoading.value = false
@@ -65,8 +79,10 @@ onMounted(async () => {
 onUnmounted(() => {
   listUnsub?.()
   researchListUnsub?.()
+  brainstormListUnsub?.()
   detailUnsub?.()
   researchDetailUnsub?.()
+  brainstormDetailUnsub?.()
 })
 
 // Watch series ID
@@ -105,7 +121,25 @@ watch(selectedResearchId, async (newId) => {
   }
 }, { immediate: true })
 
-async function handleDelete(type: 'series' | 'research', id: string) {
+// Watch brainstorm ID
+watch(selectedBrainstormId, async (newId) => {
+  if (brainstormDetailUnsub) { brainstormDetailUnsub(); brainstormDetailUnsub = null }
+  brainstormDetail.value = null
+  if (!newId) return
+  brainstormDetailLoading.value = true
+  try {
+    const client = getConvexClient()
+    brainstormDetailUnsub = client.onUpdate('brainstorm/queries:getById' as any, { briefId: newId }, (data: any) => {
+      brainstormDetail.value = data
+      brainstormDetailLoading.value = false
+    })
+  } catch (err) {
+    console.error('Failed to load brainstorm brief:', err)
+    brainstormDetailLoading.value = false
+  }
+}, { immediate: true })
+
+async function handleDelete(type: 'series' | 'research' | 'brainstorm', id: string) {
   if (!confirm('Delete this item? This cannot be undone.')) return
   deletingId.value = id
   try {
@@ -113,6 +147,9 @@ async function handleDelete(type: 'series' | 'research', id: string) {
     if (type === 'series') {
       await client.mutation('series/mutations:remove' as any, { seriesId: id })
       if (selectedSeriesId.value === id) router.push('/notebook')
+    } else if (type === 'brainstorm') {
+      await client.mutation('brainstorm/mutations:remove' as any, { briefId: id })
+      if (selectedBrainstormId.value === id) router.push('/notebook')
     } else {
       await client.mutation('research/mutations:remove' as any, { noteId: id })
       if (selectedResearchId.value === id) router.push('/notebook')
@@ -151,13 +188,15 @@ const combinedList = computed(() => {
   const items = [
     ...seriesList.value.map(s => ({ type: 'series' as const, id: s._id, title: s.title, subtitle: s.tagline || '', date: s.createdAt || 0, status: s.status || 'draft' })),
     ...researchList.value.map(r => ({ type: 'research' as const, id: r._id, title: r.scriptureRef, subtitle: r.topicOrAngle || '', date: r.createdAt || 0, status: r.status || 'draft' })),
+    ...brainstormList.value.map(b => ({ type: 'brainstorm' as const, id: b._id, title: b.passage, subtitle: b.bigIdea || '', date: b.createdAt || 0, status: b.status || 'draft' })),
   ]
   return items.sort((a, b) => b.date - a.date)
 })
 
 const filteredList = computed(() => {
   if (activeTab.value === 'series') return combinedList.value.filter(i => i.type === 'series')
-  return combinedList.value.filter(i => i.type === 'research')
+  if (activeTab.value === 'research') return combinedList.value.filter(i => i.type === 'research')
+  return combinedList.value.filter(i => i.type === 'brainstorm')
 })
 </script>
 
@@ -178,7 +217,8 @@ const filteredList = computed(() => {
           <p class="text-xs text-muted-foreground">
             <template v-if="view === 'series'">Series details</template>
             <template v-else-if="view === 'research'">Research note</template>
-            <template v-else>Your saved series plans &amp; research</template>
+            <template v-else-if="view === 'brainstorm'">Brainstorm brief</template>
+            <template v-else>Your saved series plans, research &amp; brainstorms</template>
           </p>
         </div>
       </div>
@@ -201,27 +241,34 @@ const filteredList = computed(() => {
           >
             Research Notes
           </button>
+          <button
+            @click="activeTab = 'brainstorm'"
+            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'brainstorm' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
+          >
+            Brainstorms
+          </button>
         </div>
 
         <!-- Empty state -->
         <div v-if="!listLoading && filteredList.length === 0" class="flex flex-col items-center justify-center py-20 space-y-4">
           <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
             <BookOpen v-if="activeTab === 'series'" class="h-8 w-8 text-muted-foreground" />
-            <Search v-else class="h-8 w-8 text-muted-foreground" />
+            <Search v-else-if="activeTab === 'research'" class="h-8 w-8 text-muted-foreground" />
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           </div>
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">
-              {{ activeTab === 'series' ? 'No series plans yet' : 'No research notes yet' }}
+              {{ activeTab === 'series' ? 'No series plans yet' : activeTab === 'research' ? 'No research notes yet' : 'No brainstorms yet' }}
             </h3>
             <p class="text-sm text-muted-foreground max-w-sm">
-              {{ activeTab === 'series' ? 'When you save a series plan from the Series Planner, it will appear here.' : 'When you save research from the Sermon Research tool, it will appear here.' }}
+              {{ activeTab === 'series' ? 'When you save a series plan from the Series Planner, it will appear here.' : activeTab === 'research' ? 'When you save research from the Sermon Research tool, it will appear here.' : 'When you save a brainstorm from the Brainstorm tool, it will appear here.' }}
             </p>
           </div>
           <button
-            @click="router.push(activeTab === 'series' ? '/series' : '/research')"
+            @click="router.push(activeTab === 'series' ? '/series' : activeTab === 'research' ? '/research' : '/brainstorm')"
             class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            {{ activeTab === 'series' ? 'Plan a Series' : 'Research a Passage' }}
+            {{ activeTab === 'series' ? 'Plan a Series' : activeTab === 'research' ? 'Research a Passage' : 'Start a Brainstorm' }}
           </button>
         </div>
 
@@ -234,13 +281,14 @@ const filteredList = computed(() => {
           <button
             v-for="item in filteredList"
             :key="item.id"
-            @click="router.push(item.type === 'series' ? `/notebook/${item.id}` : `/notebook/research/${item.id}`)"
+            @click="router.push(item.type === 'series' ? `/notebook/${item.id}` : item.type === 'research' ? `/notebook/research/${item.id}` : `/notebook/brainstorm/${item.id}`)"
             class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
             <div class="mt-0.5 shrink-0">
-              <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', item.type === 'series' ? 'bg-primary/10' : 'bg-blue-500/10']">
+              <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', item.type === 'series' ? 'bg-primary/10' : item.type === 'research' ? 'bg-blue-500/10' : 'bg-amber-500/10']">
                 <BookOpen v-if="item.type === 'series'" class="h-5 w-5 text-primary" />
-                <Search v-else class="h-5 w-5 text-blue-500" />
+                <Search v-else-if="item.type === 'research'" class="h-5 w-5 text-blue-500" />
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
             <div class="flex-1 min-w-0">
@@ -403,6 +451,61 @@ const filteredList = computed(() => {
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">Research note not found</h3>
             <p class="text-sm text-muted-foreground">This note may have been deleted.</p>
+          </div>
+          <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brainstorm Detail View -->
+    <div v-else-if="view === 'brainstorm'" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+        <div v-if="brainstormDetailLoading" class="flex items-center justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
+        <div v-else-if="brainstormDetail" class="space-y-6">
+          <!-- Title + actions -->
+          <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ brainstormDetail.passage }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">Brainstorm</span>
+              </div>
+              <p v-if="brainstormDetail.bigIdea" class="text-sm text-muted-foreground">{{ brainstormDetail.bigIdea }}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="handleDelete('brainstorm', brainstormDetail._id)"
+                :disabled="deletingId === brainstormDetail._id"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <!-- Markdown content -->
+          <div v-if="brainstormDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground prose-table:my-3 prose-table:text-sm prose-th:px-3 prose-th:py-2 prose-th:bg-muted/50 prose-th:font-medium prose-td:px-3 prose-td:py-1.5 prose-td:border-t prose-td:border-border">
+            <div v-html="marked.parse(brainstormDetail.content)" />
+          </div>
+
+          <!-- Metadata -->
+          <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
+            <span v-if="brainstormDetail.createdAt">Created {{ formatDate(brainstormDetail.createdAt) }}</span>
+            <span v-if="brainstormDetail.updatedAt && brainstormDetail.updatedAt !== brainstormDetail.createdAt">Updated {{ formatDate(brainstormDetail.updatedAt) }}</span>
+            <span v-if="brainstormDetail.seriesId" class="text-xs text-muted-foreground">Linked to series</span>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col items-center justify-center py-20 space-y-4">
+          <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <div class="text-center space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">Brief not found</h3>
+            <p class="text-sm text-muted-foreground">This brief may have been deleted.</p>
           </div>
           <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
         </div>
