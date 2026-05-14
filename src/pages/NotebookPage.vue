@@ -51,6 +51,12 @@ const brainstormDetail = ref<any>(null)
 const brainstormDetailLoading = ref(false)
 let brainstormDetailUnsub: (() => void) | null = null
 
+// ── Series-linked items ──
+const seriesResearchNotes = ref<any[]>([])
+let seriesResearchUnsub: (() => void) | null = null
+const seriesBrainstormBriefs = ref<any[]>([])
+let seriesBrainstormUnsub: (() => void) | null = null
+
 // ── Active tab for list view ──
 const activeTab = ref<'prep' | 'content' | 'pastoral'>('prep')
 
@@ -83,6 +89,8 @@ onUnmounted(() => {
   detailUnsub?.()
   researchDetailUnsub?.()
   brainstormDetailUnsub?.()
+  seriesResearchUnsub?.()
+  seriesBrainstormUnsub?.()
 })
 
 // Watch series ID
@@ -96,6 +104,14 @@ watch(selectedSeriesId, async (newId) => {
     detailUnsub = client.onUpdate('series/queries:getWithWeeks' as any, { seriesId: newId }, (data: any) => {
       seriesDetail.value = data
       detailLoading.value = false
+    })
+    // Load research notes linked to this series
+    seriesResearchUnsub = client.onUpdate('research/queries:getBySeriesId' as any, { seriesId: newId }, (data: any) => {
+      seriesResearchNotes.value = data ?? []
+    })
+    // Load brainstorm briefs linked to this series
+    seriesBrainstormUnsub = client.onUpdate('brainstorm/queries:getBySeriesId' as any, { seriesId: newId }, (data: any) => {
+      seriesBrainstormBriefs.value = data ?? []
     })
   } catch (err) {
     console.error('Failed to load series:', err)
@@ -438,6 +454,48 @@ const filteredList = computed(() => {
             </div>
           </div>
 
+
+          <!-- Linked Research Notes -->
+          <div v-if="seriesResearchNotes.length > 0" class="space-y-3">
+            <h3 class="text-sm font-medium text-foreground">Research Notes <span class="text-muted-foreground font-normal">({{ seriesResearchNotes.length }})</span></h3>
+            <div class="space-y-2">
+              <button
+                v-for="note in seriesResearchNotes" :key="note._id"
+                @click="router.push(`/notebook/research/${note._id}`)"
+                class="w-full group flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-all hover:border-blue-300/50 hover:shadow-sm"
+              >
+                <div class="shrink-0 h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Search class="h-4 w-4 text-blue-500" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-foreground truncate">{{ note.scriptureRef }}</div>
+                  <div v-if="note.topicOrAngle" class="text-xs text-muted-foreground truncate">{{ note.topicOrAngle }}</div>
+                </div>
+                <ChevronRight class="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Linked Brainstorm Briefs -->
+          <div v-if="seriesBrainstormBriefs.length > 0" class="space-y-3">
+            <h3 class="text-sm font-medium text-foreground">Brainstorm Briefs <span class="text-muted-foreground font-normal">({{ seriesBrainstormBriefs.length }})</span></h3>
+            <div class="space-y-2">
+              <button
+                v-for="brief in seriesBrainstormBriefs" :key="brief._id"
+                @click="router.push(`/notebook/brainstorm/${brief._id}`)"
+                class="w-full group flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-all hover:border-amber-300/50 hover:shadow-sm"
+              >
+                <div class="shrink-0 h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-foreground truncate">{{ brief.passage }}</div>
+                  <div v-if="brief.bigIdea" class="text-xs text-muted-foreground truncate">{{ brief.bigIdea }}</div>
+                </div>
+                <ChevronRight class="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+              </button>
+            </div>
+          </div>
           <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
             <span v-if="seriesDetail.series.createdAt">Created {{ formatDate(seriesDetail.series.createdAt) }}</span>
             <span v-if="seriesDetail.series.updatedAt && seriesDetail.series.updatedAt !== seriesDetail.series.createdAt">Updated {{ formatDate(seriesDetail.series.updatedAt) }}</span>

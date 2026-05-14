@@ -28,3 +28,16 @@ export const getById = query({
     return brief
   },
 })
+
+export const getBySeriesId = query({
+  args: { seriesId: v.id("series") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (!userId) return []
+
+    return await ctx.db
+      .query("brainstormBriefs")
+      .withIndex("by_series", (q) => q.eq("seriesId", args.seriesId))
+      .collect()
+  },
+})
