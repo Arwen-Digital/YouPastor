@@ -10,11 +10,9 @@ import {
   Lightbulb,
   Search as ResearchIcon,
   Layers,
-  RefreshCw,
   FileText,
   Video,
   Users,
-  MessageSquare,
   MessageCircle,
   Calendar,
   Mail,
@@ -39,10 +37,8 @@ async function handleSignOut() {
 
 const expandedSections = ref<Record<string, boolean>>({
   'sermon-prep': true,
-  'sermon-repurposing': false,
-  'social-media': false,
-  'written-communication': false,
-  'pastoral-rhythm': false,
+  'content': false,
+  'pastoral': false,
 })
 
 function toggleSection(section: string) {
@@ -80,38 +76,24 @@ const workspaceSections: NavItem[] = [
     ],
   },
   {
-    label: 'Sermon Repurposing',
-    icon: RefreshCw,
-    section: 'sermon-repurposing',
+    label: 'Content',
+    icon: FileText,
+    section: 'content',
     children: [
       { label: 'Sermon to Blog', icon: FileText, path: '/workspace/sermon-repurposing/blog' },
       { label: 'Sermon to Youtube', icon: Video, path: '/workspace/sermon-repurposing/youtube' },
       { label: 'Small Group Questions', icon: Users, path: '/workspace/sermon-repurposing/small-group' },
-    ],
-  },
-  {
-    label: 'Social Media',
-    icon: MessageSquare,
-    section: 'social-media',
-    children: [
       { label: 'Church Social Post', icon: MessageCircle, path: '/workspace/social-media/post' },
       { label: 'Social Media Calendar', icon: Calendar, path: '/workspace/social-media/calendar' },
-    ],
-  },
-  {
-    label: 'Written Communication',
-    icon: Mail,
-    section: 'written-communication',
-    children: [
-      { label: 'Announcement Script', icon: Mic, path: '/workspace/written-communication/announcement' },
       { label: 'Church Email', icon: Mail, path: '/workspace/written-communication/email' },
+      { label: 'Announcement Script', icon: Mic, path: '/workspace/written-communication/announcement' },
       { label: 'Church Letter', icon: FileText, path: '/workspace/written-communication/letter' },
     ],
   },
   {
-    label: 'Pastoral Rhythm',
+    label: 'Pastoral',
     icon: Heart,
-    section: 'pastoral-rhythm',
+    section: 'pastoral',
     children: [
       { label: 'Meeting Agenda', icon: List, path: '/workspace/pastoral-rhythm/agenda' },
       { label: 'Midweek Devotional', icon: BookOpen, path: '/workspace/pastoral-rhythm/devotional' },

@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getConvexClient } from '@/lib/convex'
 import { marked } from 'marked'
-import { BookOpen, ArrowLeft, ChevronRight, Trash2, Loader2, Search } from 'lucide-vue-next'
+import { BookOpen, ArrowLeft, ChevronRight, Trash2, Loader2, Search, Heart } from 'lucide-vue-next'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -52,7 +52,7 @@ const brainstormDetailLoading = ref(false)
 let brainstormDetailUnsub: (() => void) | null = null
 
 // ── Active tab for list view ──
-const activeTab = ref<'series' | 'research' | 'brainstorm'>('series')
+const activeTab = ref<'prep' | 'content' | 'pastoral'>('prep')
 
 // ── Deleting ──
 const deletingId = ref<string | null>(null)
@@ -183,20 +183,37 @@ function getStatusLabel(status: string | undefined): string {
   }
 }
 
+function getTypeBadge(type: string): { label: string; color: string } {
+  switch (type) {
+    case 'series': return { label: 'Series', color: 'bg-primary/10 text-primary' }
+    case 'research': return { label: 'Research', color: 'bg-blue-500/10 text-blue-600' }
+    case 'brainstorm': return { label: 'Brainstorm', color: 'bg-amber-500/10 text-amber-600' }
+    default: return { label: type, color: 'bg-muted text-muted-foreground' }
+  }
+}
+
 // Combined list for ordering by date
 const combinedList = computed(() => {
-  const items = [
-    ...seriesList.value.map(s => ({ type: 'series' as const, id: s._id, title: s.title, subtitle: s.tagline || '', date: s.createdAt || 0, status: s.status || 'draft' })),
-    ...researchList.value.map(r => ({ type: 'research' as const, id: r._id, title: r.scriptureRef, subtitle: r.topicOrAngle || '', date: r.createdAt || 0, status: r.status || 'draft' })),
-    ...brainstormList.value.map(b => ({ type: 'brainstorm' as const, id: b._id, title: b.passage, subtitle: b.bigIdea || '', date: b.createdAt || 0, status: b.status || 'draft' })),
+  const items: Array<{
+    type: 'series' | 'research' | 'brainstorm'
+    id: string
+    title: string
+    subtitle: string
+    date: number
+    status: string
+    tab: 'prep' | 'content' | 'pastoral'
+  }> = [
+    ...seriesList.value.map(s => ({ type: 'series' as const, id: s._id, title: s.title, subtitle: s.tagline || '', date: s.createdAt || 0, status: s.status || 'draft', tab: 'prep' as const })),
+    ...researchList.value.map(r => ({ type: 'research' as const, id: r._id, title: r.scriptureRef, subtitle: r.topicOrAngle || '', date: r.createdAt || 0, status: r.status || 'draft', tab: 'prep' as const })),
+    ...brainstormList.value.map(b => ({ type: 'brainstorm' as const, id: b._id, title: b.passage, subtitle: b.bigIdea || '', date: b.createdAt || 0, status: b.status || 'draft', tab: 'prep' as const })),
   ]
   return items.sort((a, b) => b.date - a.date)
 })
 
 const filteredList = computed(() => {
-  if (activeTab.value === 'series') return combinedList.value.filter(i => i.type === 'series')
-  if (activeTab.value === 'research') return combinedList.value.filter(i => i.type === 'research')
-  return combinedList.value.filter(i => i.type === 'brainstorm')
+  if (activeTab.value === 'prep') return combinedList.value.filter(i => i.tab === 'prep')
+  if (activeTab.value === 'content') return combinedList.value.filter(i => i.tab === 'content')
+  return combinedList.value.filter(i => i.tab === 'pastoral')
 })
 </script>
 
@@ -218,7 +235,7 @@ const filteredList = computed(() => {
             <template v-if="view === 'series'">Series details</template>
             <template v-else-if="view === 'research'">Research note</template>
             <template v-else-if="view === 'brainstorm'">Brainstorm brief</template>
-            <template v-else>Your saved series plans, research &amp; brainstorms</template>
+            <template v-else>Your saved work, organized by purpose</template>
           </p>
         </div>
       </div>
@@ -230,45 +247,52 @@ const filteredList = computed(() => {
         <!-- Tabs -->
         <div class="flex items-center gap-1 rounded-lg bg-muted p-1 mb-6 w-fit">
           <button
-            @click="activeTab = 'series'"
-            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'series' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
+            @click="activeTab = 'prep'"
+            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'prep' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
           >
-            Series Plans
+            Prep
           </button>
           <button
-            @click="activeTab = 'research'"
-            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'research' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
+            @click="activeTab = 'content'"
+            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'content' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
           >
-            Research Notes
+            Content
           </button>
           <button
-            @click="activeTab = 'brainstorm'"
-            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'brainstorm' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
+            @click="activeTab = 'pastoral'"
+            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'pastoral' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
           >
-            Brainstorms
+            Pastoral
           </button>
         </div>
 
         <!-- Empty state -->
         <div v-if="!listLoading && filteredList.length === 0" class="flex flex-col items-center justify-center py-20 space-y-4">
           <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
-            <BookOpen v-if="activeTab === 'series'" class="h-8 w-8 text-muted-foreground" />
-            <Search v-else-if="activeTab === 'research'" class="h-8 w-8 text-muted-foreground" />
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <BookOpen v-if="activeTab === 'prep'" class="h-8 w-8 text-muted-foreground" />
+            <svg v-else-if="activeTab === 'content'" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <Heart v-else class="h-8 w-8 text-muted-foreground" />
           </div>
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">
-              {{ activeTab === 'series' ? 'No series plans yet' : activeTab === 'research' ? 'No research notes yet' : 'No brainstorms yet' }}
+              {{ activeTab === 'prep' ? 'No saved items yet' : activeTab === 'content' ? 'No content yet' : 'No pastoral items yet' }}
             </h3>
             <p class="text-sm text-muted-foreground max-w-sm">
-              {{ activeTab === 'series' ? 'When you save a series plan from the Series Planner, it will appear here.' : activeTab === 'research' ? 'When you save research from the Sermon Research tool, it will appear here.' : 'When you save a brainstorm from the Brainstorm tool, it will appear here.' }}
+              {{
+                activeTab === 'prep'
+                  ? 'When you save a brainstorm, research, or series plan, it will appear here.'
+                  : activeTab === 'content'
+                  ? 'Content from Blog, YouTube, Social, and Email tools will appear here.'
+                  : 'Pastoral items like agendas and devotionals will appear here.'
+              }}
             </p>
           </div>
           <button
-            @click="router.push(activeTab === 'series' ? '/series' : activeTab === 'research' ? '/research' : '/brainstorm')"
+            v-if="activeTab === 'prep'"
+            @click="router.push('/')"
             class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            {{ activeTab === 'series' ? 'Plan a Series' : activeTab === 'research' ? 'Research a Passage' : 'Start a Brainstorm' }}
+            Get started
           </button>
         </div>
 
@@ -285,10 +309,10 @@ const filteredList = computed(() => {
             class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
             <div class="mt-0.5 shrink-0">
-              <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', item.type === 'series' ? 'bg-primary/10' : item.type === 'research' ? 'bg-blue-500/10' : 'bg-amber-500/10']">
-                <BookOpen v-if="item.type === 'series'" class="h-5 w-5 text-primary" />
-                <Search v-else-if="item.type === 'research'" class="h-5 w-5 text-blue-500" />
-                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', getTypeBadge(item.type).color]">
+                <BookOpen v-if="item.type === 'series'" class="h-5 w-5" />
+                <Search v-else-if="item.type === 'research'" class="h-5 w-5" />
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
             <div class="flex-1 min-w-0">
@@ -298,14 +322,15 @@ const filteredList = computed(() => {
                   <p v-if="item.subtitle" class="text-xs text-muted-foreground mt-0.5 truncate">{{ item.subtitle }}</p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', getStatusColor(item.status)]">
-                    {{ getStatusLabel(item.status) }}
+                  <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', getTypeBadge(item.type).color]">
+                    {{ getTypeBadge(item.type).label }}
                   </span>
                   <ChevronRight class="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
               </div>
               <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                 <span v-if="item.date" class="shrink-0">{{ formatDate(item.date) }}</span>
+                <span :class="['text-xs px-1.5 py-0.5 rounded font-medium', getStatusColor(item.status)]">{{ getStatusLabel(item.status) }}</span>
               </div>
             </div>
           </button>
