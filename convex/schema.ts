@@ -57,12 +57,48 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_series", ["seriesId"]),
 
+  // Sermon series — saved from the Series Planner skill
   series: defineTable({
     userId: v.id("users"),
     title: v.string(),
+    tagline: v.optional(v.string()),
+    scopeAssessment: v.optional(v.string()),
+    seriesArc: v.optional(v.string()),
+    durationCheck: v.optional(v.string()),
+    specialAttention: v.optional(v.string()),
+    launchRecommendation: v.optional(v.string()),
     description: v.optional(v.string()),
+    status: v.optional(v.string()),
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
+  // Individual weeks within a series
+  seriesWeeks: defineTable({
+    seriesId: v.id("series"),
+    userId: v.id("users"),
+    weekNumber: v.number(),
+    sermonTitle: v.optional(v.string()),
+    scriptureRef: v.optional(v.string()),
+    bigIdea: v.optional(v.string()),
+    connectiveThread: v.optional(v.string()),
+  })
+    .index("by_series", ["seriesId"])
+    .index("by_user", ["userId"]),
+
+  // Sermon research notes — saved from the Sermon Research skill
+  // Entire research output is stored as a single Markdown blob in `content`.
+  researchNotes: defineTable({
+    userId: v.id("users"),
+    scriptureRef: v.string(),
+    topicOrAngle: v.optional(v.string()),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
   })
     .index("by_user", ["userId"]),
 

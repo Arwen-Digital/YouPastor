@@ -12,6 +12,7 @@ export interface ChatCompletionOptions {
 
 export interface ChatCompletionResult {
   content: string
+  citations?: string[]
   usage?: {
     promptTokens: number
     completionTokens: number

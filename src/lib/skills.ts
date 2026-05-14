@@ -34,11 +34,46 @@ export function getSkillPrompt(slug: string): string {
   return skills[slug] ?? ''
 }
 
-export function buildSystemPrompt(skillSlug: string): string {
+export interface ChurchContext {
+  churchName?: string
+  pastorName?: string
+  denomination?: string
+  averageAttendance?: string
+  location?: string
+  bibleTranslation?: string
+}
+
+/**
+ * Build context block from church profile data.
+ * This replaces the foundation's "I need a few details" section
+ * with the actual filled-in values so the AI doesn't ask for them.
+ */
+export function buildContextBlock(context: ChurchContext): string {
+  const lines: string[] = []
+  lines.push('## Church Context (filled in from profile)')
+  lines.push('')
+  lines.push('The pastor has already provided their church context. Use these values throughout the conversation:')
+  lines.push('')
+  lines.push(`CHURCH_NAME: ${context.churchName || 'Not provided'}`)
+  lines.push(`PASTOR_NAME: ${context.pastorName || 'Not provided'}`)
+  lines.push(`DENOMINATION: ${context.denomination || 'Nondenominational evangelical'}`)
+  lines.push(`ATTENDANCE: ${context.averageAttendance || 'Not provided'}`)
+  lines.push(`LOCATION: ${context.location || 'Not provided'}`)
+  lines.push(`BIBLE_TRANSLATION: ${context.bibleTranslation || 'NIV'}`)
+  lines.push('')
+  lines.push('Do NOT ask the pastor for these details again. They are already set. Use them directly in your output.')
+  return lines.join('\n')
+}
+
+export function buildSystemPrompt(skillSlug: string, context?: ChurchContext): string {
   const foundation = skills['pastor-foundation']
   const skill = skills[skillSlug]
+  const contextBlock = context ? buildContextBlock(context) : ''
 
-  if (!skill) return foundation
+  if (!skill) {
+    return contextBlock ? `${contextBlock}\n\n---\n\n${foundation}` : foundation
+  }
 
-  return `${foundation}\n\n---\n\n${skill}`
+  const parts = [contextBlock, foundation, skill].filter(Boolean)
+  return parts.join('\n\n---\n\n')
 }

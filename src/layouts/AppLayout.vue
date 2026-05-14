@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import {
   Home,
   Search,
+  Notebook,
   BookOpen,
   Lightbulb,
   Search as ResearchIcon,
@@ -49,7 +50,8 @@ function toggleSection(section: string) {
 }
 
 function isActive(path: string): boolean {
-  return route.path === path
+  if (path === '/') return route.path === '/'
+  return route.path === path || route.path.startsWith(path + '/')
 }
 
 interface NavItem {
@@ -62,6 +64,7 @@ interface NavItem {
 
 const topNav: NavItem[] = [
   { label: 'Home', icon: Home, path: '/' },
+  { label: 'Notebook', icon: Notebook, path: '/notebook' },
   { label: 'Search', icon: Search, path: '/search' },
 ]
 

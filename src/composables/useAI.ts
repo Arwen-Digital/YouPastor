@@ -7,10 +7,25 @@ import type {
 } from '@/lib/ai/types'
 import { getProviderForRole } from '@/lib/ai/factory'
 
-export function useAI(role: AIRole = 'orchestrator') {
+export function useAI(initialRole: AIRole = 'orchestrator') {
   const isLoading = ref(false)
   const error: Ref<Error | null> = ref(null)
   const streamingContent = ref('')
+  const citations = ref<string[]>([])
+
+  // Dynamic role: allows switching mid-conversation (e.g., orchestrator → researcher)
+  const role = ref<AIRole>(initialRole)
+
+  /**
+   * Switch to a different model role for subsequent calls.
+   * E.g. call setRole('researcher') after orchestrator finishes its output.
+   */
+  function setRole(newRole: AIRole) {
+    if (role.value !== newRole) {
+      role.value = newRole
+      console.log('[useAI] Role switched to:', newRole)
+    }
+  }
 
   async function sendMessage(
     messages: Message[],
@@ -19,12 +34,16 @@ export function useAI(role: AIRole = 'orchestrator') {
     isLoading.value = true
     error.value = null
     try {
-      const provider = getProviderForRole(role)
+      const provider = getProviderForRole(role.value)
       console.log('[useAI] Using provider:', provider.name, 'model:', provider.model)
       const result = await provider.chat({ messages, ...options })
-      console.log('[useAI] Result → content length:', result.content.length, 'model:', result.model)
+      console.log('[useAI] Result → content length:', result.content.length, 'model:', result.model, 'citations:', result.citations?.length ?? 0)
       if (!result.content.trim()) {
         throw new Error('AI returned an empty response. The model may be overloaded or unavailable. Try again or switch models in Settings.')
+      }
+      // Store citations if present (from Perplexity/Sonar)
+      if (result.citations && result.citations.length > 0) {
+        citations.value = result.citations
       }
       return result
     } catch (err) {
@@ -44,9 +63,10 @@ export function useAI(role: AIRole = 'orchestrator') {
     isLoading.value = true
     error.value = null
     streamingContent.value = ''
+    citations.value = []
 
     try {
-      const provider = getProviderForRole(role)
+      const provider = getProviderForRole(role.value)
       console.log('[useAI] Stream using provider:', provider.name, 'model:', provider.model)
       await provider.chatStream(
         { messages, ...options },
@@ -72,6 +92,9 @@ export function useAI(role: AIRole = 'orchestrator') {
     isLoading,
     error,
     streamingContent,
+    citations,
+    role,
+    setRole,
     sendMessage,
     streamMessage,
   }

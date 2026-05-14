@@ -25,6 +25,21 @@ const routes = [
         component: () => import('@/pages/HomePage.vue'),
       },
       {
+        path: 'notebook',
+        name: 'notebook',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
+        path: 'notebook/research/:researchId',
+        name: 'notebook-research-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
+        path: 'notebook/:id',
+        name: 'notebook-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
         path: 'brainstorm',
         name: 'brainstorm',
         component: () => import('@/pages/BrainstormPage.vue'),

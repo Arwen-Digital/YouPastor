@@ -111,8 +111,13 @@ export class OpenRouterProvider implements AIProvider {
       )
     }
 
+    // Extract citations from Perplexity/Sonar responses
+    // OpenRouter passes through Perplexity's citations array at the top level
+    const citations: string[] = data.citations ?? choice?.message?.citations ?? []
+
     return {
       content,
+      citations: citations.length > 0 ? citations : undefined,
       usage: data.usage
         ? {
             promptTokens: data.usage.prompt_tokens,
