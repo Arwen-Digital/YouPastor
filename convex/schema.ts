@@ -118,6 +118,28 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_series", ["seriesId"]),
 
+  // Meeting agendas — saved from the Meeting Agenda skill
+  meetingAgendas: defineTable({
+    userId: v.id("users"),
+    meetingType: v.string(),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
+  // Midweek devotionals — saved from the Midweek Devotional skill
+  devotionals: defineTable({
+    userId: v.id("users"),
+    scriptureRef: v.string(),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
   agentWorkflows: defineTable({
     userId: v.id("users"),
     sermonId: v.optional(v.id("sermons")),

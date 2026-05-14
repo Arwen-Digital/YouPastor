@@ -9,9 +9,13 @@ import { useConvexQuery } from '@/composables/useConvexQuery'
 import { useSaveSeries } from '@/composables/useSaveSeries'
 import { useSaveResearch } from '@/composables/useSaveResearch'
 import { useSaveBrainstorm } from '@/composables/useSaveBrainstorm'
+import { useSaveAgenda } from '@/composables/useSaveAgenda'
+import { useSaveDevotional } from '@/composables/useSaveDevotional'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
+import SaveAgendaModal from '@/components/SaveAgendaModal.vue'
+import SaveDevotionalModal from '@/components/SaveDevotionalModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -79,7 +83,9 @@ const { isLoading, streamingContent, error, streamMessage, sendMessage, citation
 const isSeriesPlanner = props.skillSlug === 'sermon-series'
 const isSermonResearch = props.skillSlug === 'sermon-research'
 const isSermonBrainstorm = props.skillSlug === 'sermon-brainstorm'
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm
+const isMeetingAgenda = props.skillSlug === 'meeting-agenda'
+const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional
 
 // Series save flow
 const {
@@ -113,6 +119,28 @@ const {
   save: confirmSaveBrainstorm,
   reset: resetBrainstormSave,
 } = useSaveBrainstorm()
+
+// Agenda save flow
+const {
+  status: agendaSaveStatus,
+  preview: agendaPreview,
+  error: agendaSaveError,
+  savedAgendaId,
+  extract: extractAgenda,
+  save: confirmSaveAgenda,
+  reset: resetAgendaSave,
+} = useSaveAgenda()
+
+// Devotional save flow
+const {
+  status: devotionalSaveStatus,
+  preview: devotionalPreview,
+  error: devotionalSaveError,
+  savedDevotionalId,
+  extract: extractDevotional,
+  save: confirmSaveDevotional,
+  reset: resetDevotionalSave,
+} = useSaveDevotional()
 
 const showSaveModal = ref(false)
 
@@ -189,12 +217,17 @@ watch(brainstormIntakePrompt, (newPrompt) => {
 const canSave = computed(() => {
   if (!canShowSave) return false
   if (isLoading.value) return false
-  const status = isSeriesPlanner ? seriesSaveStatus.value : isSermonBrainstorm ? brainstormSaveStatus.value : researchSaveStatus.value
+  const status = isSeriesPlanner ? seriesSaveStatus.value
+    : isSermonBrainstorm ? brainstormSaveStatus.value
+    : isMeetingAgenda ? agendaSaveStatus.value
+    : isMidweekDevotional ? devotionalSaveStatus.value
+    : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
-  // Research and brainstorm need at least 2 assistant msgs (intake + brief)
-  // Series planner needs more back-and-forth (6 assistant msgs)
-  const threshold = isSeriesPlanner ? 6 : 2
+  // Series planner needs more back-and-forth (6 msgs)
+  // Meeting agenda needs at least 3 (assessment + agenda + tips)
+  // Devotional needs at least 3 (direction + devotional + polish)
+  const threshold = isSeriesPlanner ? 6 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -340,6 +373,8 @@ async function handleSaveClick() {
   if (isSeriesPlanner) resetSeriesSave()
   if (isSermonResearch) resetResearchSave()
   if (isSermonBrainstorm) resetBrainstormSave()
+  if (isMeetingAgenda) resetAgendaSave()
+  if (isMidweekDevotional) resetDevotionalSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -353,6 +388,10 @@ async function handleSaveClick() {
     await extractResearch(extractionMessages as any, role.value)
   } else if (isSermonBrainstorm) {
     await extractBrainstorm(extractionMessages as any)
+  } else if (isMeetingAgenda) {
+    await extractAgenda(extractionMessages as any)
+  } else if (isMidweekDevotional) {
+    await extractDevotional(extractionMessages as any)
   }
 }
 
@@ -366,6 +405,14 @@ function handleSaveConfirmResearch(data: any) {
 
 function handleSaveConfirmBrainstorm(data: any) {
   confirmSaveBrainstorm(data)
+}
+
+function handleSaveConfirmAgenda(data: any) {
+  confirmSaveAgenda(data)
+}
+
+function handleSaveConfirmDevotional(data: any) {
+  confirmSaveDevotional(data)
 }
 
 function handleSaveModalClose() {
@@ -382,6 +429,14 @@ function handleSaveModalClose() {
     const briefId = savedBriefId.value
     resetBrainstormSave()
     router.push(`/notebook/brainstorm/${briefId}`)
+  } else if (isMeetingAgenda && agendaSaveStatus.value === 'saved' && savedAgendaId.value) {
+    const agendaId = savedAgendaId.value
+    resetAgendaSave()
+    router.push(`/notebook/agenda/${agendaId}`)
+  } else if (isMidweekDevotional && devotionalSaveStatus.value === 'saved' && savedDevotionalId.value) {
+    const devotionalId = savedDevotionalId.value
+    resetDevotionalSave()
+    router.push(`/notebook/devotional/${devotionalId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -390,6 +445,12 @@ function handleSaveModalClose() {
     router.push('/notebook')
   } else if (brainstormSaveStatus.value === 'saved') {
     resetBrainstormSave()
+    router.push('/notebook')
+  } else if (agendaSaveStatus.value === 'saved') {
+    resetAgendaSave()
+    router.push('/notebook')
+  } else if (devotionalSaveStatus.value === 'saved') {
+    resetDevotionalSave()
     router.push('/notebook')
   }
 }
@@ -498,7 +559,6 @@ function handleSaveModalClose() {
           placeholder="Type your response..."
           rows="1"
           class="flex-1 resize-none rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none placeholder:text-muted-foreground/70 focus:border-ring transition-colors"
-          :disabled="isLoading"
         />
         <button
           @click="handleSend"
@@ -548,6 +608,30 @@ function handleSaveModalClose() {
       :is-saving="brainstormSaveStatus === 'saving'"
       :saved-id="savedBriefId"
       @save="handleSaveConfirmBrainstorm"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveAgendaModal
+      v-if="showSaveModal && isMeetingAgenda"
+      :save-status="agendaSaveStatus"
+      :preview="agendaPreview"
+      :save-error="agendaSaveError"
+      :is-saving="agendaSaveStatus === 'saving'"
+      :saved-id="savedAgendaId"
+      @save="handleSaveConfirmAgenda"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveDevotionalModal
+      v-if="showSaveModal && isMidweekDevotional"
+      :save-status="devotionalSaveStatus"
+      :preview="devotionalPreview"
+      :save-error="devotionalSaveError"
+      :is-saving="devotionalSaveStatus === 'saving'"
+      :saved-id="savedDevotionalId"
+      @save="handleSaveConfirmDevotional"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />

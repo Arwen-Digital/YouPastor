@@ -3,18 +3,20 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getConvexClient } from '@/lib/convex'
 import { marked } from 'marked'
-import { BookOpen, ArrowLeft, ChevronRight, Trash2, Loader2, Search, Heart } from 'lucide-vue-next'
+import { BookOpen, ArrowLeft, ChevronRight, Trash2, Loader2, Search, Heart, CalendarDays } from 'lucide-vue-next'
 
 marked.setOptions({ breaks: true, gfm: true })
 
 const router = useRouter()
 const route = useRoute()
 
-// Which view: 'list', 'series', 'research'
+// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional'
 const view = computed(() => {
-  if (!route.params.id && !route.params.researchId && !route.params.brainstormId) return 'list'
+  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId) return 'list'
   if (route.params.researchId) return 'research'
   if (route.params.brainstormId) return 'brainstorm'
+  if (route.params.agendaId) return 'agenda'
+  if (route.params.devotionalId) return 'devotional'
   if (route.params.id) return 'series'
   return 'list'
 })
@@ -22,6 +24,8 @@ const view = computed(() => {
 const selectedSeriesId = computed(() => route.params.id as string | undefined)
 const selectedResearchId = computed(() => route.params.researchId as string | undefined)
 const selectedBrainstormId = computed(() => route.params.brainstormId as string | undefined)
+const selectedAgendaId = computed(() => route.params.agendaId as string | undefined)
+const selectedDevotionalId = computed(() => route.params.devotionalId as string | undefined)
 
 // ── Series list ──
 const seriesList = ref<any[]>([])
@@ -35,6 +39,14 @@ let researchListUnsub: (() => void) | null = null
 // ── Brainstorm briefs list ──
 const brainstormList = ref<any[]>([])
 let brainstormListUnsub: (() => void) | null = null
+
+// ── Agendas list ──
+const agendaList = ref<any[]>([])
+let agendaListUnsub: (() => void) | null = null
+
+// ── Devotionals list ──
+const devotionalList = ref<any[]>([])
+let devotionalListUnsub: (() => void) | null = null
 
 // ── Series detail ──
 const seriesDetail = ref<any>(null)
@@ -51,6 +63,16 @@ const brainstormDetail = ref<any>(null)
 const brainstormDetailLoading = ref(false)
 let brainstormDetailUnsub: (() => void) | null = null
 
+// ── Agenda detail ──
+const agendaDetail = ref<any>(null)
+const agendaDetailLoading = ref(false)
+let agendaDetailUnsub: (() => void) | null = null
+
+// ── Devotional detail ──
+const devotionalDetail = ref<any>(null)
+const devotionalDetailLoading = ref(false)
+let devotionalDetailUnsub: (() => void) | null = null
+
 // ── Series-linked items ──
 const seriesResearchNotes = ref<any[]>([])
 let seriesResearchUnsub: (() => void) | null = null
@@ -59,6 +81,8 @@ let seriesBrainstormUnsub: (() => void) | null = null
 
 // ── Active tab for list view ──
 const activeTab = ref<'prep' | 'content' | 'pastoral'>('prep')
+const prepFilter = ref<'all' | 'series' | 'research' | 'brainstorm'>('all')
+const pastoralFilter = ref<'all' | 'devotional' | 'agenda'>('all')
 
 // ── Deleting ──
 const deletingId = ref<string | null>(null)
@@ -76,6 +100,12 @@ onMounted(async () => {
     brainstormListUnsub = client.onUpdate('brainstorm/queries:listMine' as any, {}, (data: any) => {
       brainstormList.value = data ?? []
     })
+    agendaListUnsub = client.onUpdate('agendas/queries:listMine' as any, {}, (data: any) => {
+      agendaList.value = data ?? []
+    })
+    devotionalListUnsub = client.onUpdate('devotionals/queries:listMine' as any, {}, (data: any) => {
+      devotionalList.value = data ?? []
+    })
   } catch (err) {
     console.error('Failed to load notebook:', err)
     listLoading.value = false
@@ -86,9 +116,13 @@ onUnmounted(() => {
   listUnsub?.()
   researchListUnsub?.()
   brainstormListUnsub?.()
+  agendaListUnsub?.()
+  devotionalListUnsub?.()
   detailUnsub?.()
   researchDetailUnsub?.()
   brainstormDetailUnsub?.()
+  agendaDetailUnsub?.()
+  devotionalDetailUnsub?.()
   seriesResearchUnsub?.()
   seriesBrainstormUnsub?.()
 })
@@ -155,7 +189,43 @@ watch(selectedBrainstormId, async (newId) => {
   }
 }, { immediate: true })
 
-async function handleDelete(type: 'series' | 'research' | 'brainstorm', id: string) {
+// Watch agenda ID
+watch(selectedAgendaId, async (newId) => {
+  if (agendaDetailUnsub) { agendaDetailUnsub(); agendaDetailUnsub = null }
+  agendaDetail.value = null
+  if (!newId) return
+  agendaDetailLoading.value = true
+  try {
+    const client = getConvexClient()
+    agendaDetailUnsub = client.onUpdate('agendas/queries:getById' as any, { agendaId: newId }, (data: any) => {
+      agendaDetail.value = data
+      agendaDetailLoading.value = false
+    })
+  } catch (err) {
+    console.error('Failed to load agenda:', err)
+    agendaDetailLoading.value = false
+  }
+}, { immediate: true })
+
+// Watch devotional ID
+watch(selectedDevotionalId, async (newId) => {
+  if (devotionalDetailUnsub) { devotionalDetailUnsub(); devotionalDetailUnsub = null }
+  devotionalDetail.value = null
+  if (!newId) return
+  devotionalDetailLoading.value = true
+  try {
+    const client = getConvexClient()
+    devotionalDetailUnsub = client.onUpdate('devotionals/queries:getById' as any, { devotionalId: newId }, (data: any) => {
+      devotionalDetail.value = data
+      devotionalDetailLoading.value = false
+    })
+  } catch (err) {
+    console.error('Failed to load devotional:', err)
+    devotionalDetailLoading.value = false
+  }
+}, { immediate: true })
+
+async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional', id: string) {
   if (!confirm('Delete this item? This cannot be undone.')) return
   deletingId.value = id
   try {
@@ -166,6 +236,12 @@ async function handleDelete(type: 'series' | 'research' | 'brainstorm', id: stri
     } else if (type === 'brainstorm') {
       await client.mutation('brainstorm/mutations:remove' as any, { briefId: id })
       if (selectedBrainstormId.value === id) router.push('/notebook')
+    } else if (type === 'agenda') {
+      await client.mutation('agendas/mutations:remove' as any, { agendaId: id })
+      if (selectedAgendaId.value === id) router.push('/notebook')
+    } else if (type === 'devotional') {
+      await client.mutation('devotionals/mutations:remove' as any, { devotionalId: id })
+      if (selectedDevotionalId.value === id) router.push('/notebook')
     } else {
       await client.mutation('research/mutations:remove' as any, { noteId: id })
       if (selectedResearchId.value === id) router.push('/notebook')
@@ -223,6 +299,8 @@ function getTypeBadge(type: string): { label: string; color: string } {
     case 'series': return { label: 'Series', color: 'bg-primary/10 text-primary' }
     case 'research': return { label: 'Research', color: 'bg-blue-500/10 text-blue-600' }
     case 'brainstorm': return { label: 'Brainstorm', color: 'bg-amber-500/10 text-amber-600' }
+    case 'agenda': return { label: 'Agenda', color: 'bg-emerald-500/10 text-emerald-600' }
+    case 'devotional': return { label: 'Devotional', color: 'bg-violet-500/10 text-violet-600' }
     default: return { label: type, color: 'bg-muted text-muted-foreground' }
   }
 }
@@ -236,7 +314,7 @@ function getSeriesName(seriesId: string | undefined): string {
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
-    type: 'series' | 'research' | 'brainstorm'
+    type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional'
     id: string
     title: string
     subtitle: string
@@ -247,14 +325,28 @@ const combinedList = computed(() => {
     ...seriesList.value.map(s => ({ type: 'series' as const, id: s._id, title: s.title, subtitle: s.tagline || '', date: s.createdAt || 0, status: s.status || 'draft', tab: 'prep' as const })),
     ...researchList.value.map(r => ({ type: 'research' as const, id: r._id, title: r.scriptureRef, subtitle: r.topicOrAngle || '', date: r.createdAt || 0, status: r.status || 'draft', tab: 'prep' as const })),
     ...brainstormList.value.map(b => ({ type: 'brainstorm' as const, id: b._id, title: b.passage, subtitle: b.bigIdea || '', date: b.createdAt || 0, status: b.status || 'draft', tab: 'prep' as const })),
+    ...agendaList.value.map(a => ({ type: 'agenda' as const, id: a._id, title: a.meetingType, subtitle: '', date: a.createdAt || 0, status: a.status || 'draft', tab: 'pastoral' as const })),
+    ...devotionalList.value.map(d => ({ type: 'devotional' as const, id: d._id, title: d.scriptureRef, subtitle: '', date: d.createdAt || 0, status: d.status || 'draft', tab: 'pastoral' as const })),
   ]
   return items.sort((a, b) => b.date - a.date)
 })
 
 const filteredList = computed(() => {
-  if (activeTab.value === 'prep') return combinedList.value.filter(i => i.tab === 'prep')
+  if (activeTab.value === 'prep') {
+    let items = combinedList.value.filter(i => i.tab === 'prep')
+    if (prepFilter.value !== 'all') {
+      items = items.filter(i => i.type === prepFilter.value)
+    }
+    return items
+  }
   if (activeTab.value === 'content') return combinedList.value.filter(i => i.tab === 'content')
-  return combinedList.value.filter(i => i.tab === 'pastoral')
+  
+  // Pastoral tab
+  let pastoralItems = combinedList.value.filter(i => i.tab === 'pastoral')
+  if (pastoralFilter.value !== 'all') {
+    pastoralItems = pastoralItems.filter(i => i.type === pastoralFilter.value)
+  }
+  return pastoralItems
 })
 </script>
 
@@ -276,6 +368,8 @@ const filteredList = computed(() => {
             <template v-if="view === 'series'">Series details</template>
             <template v-else-if="view === 'research'">Research note</template>
             <template v-else-if="view === 'brainstorm'">Brainstorm brief</template>
+            <template v-else-if="view === 'agenda'">Meeting agenda</template>
+            <template v-else-if="view === 'devotional'">Midweek devotional</template>
             <template v-else>Your saved work, organized by purpose</template>
           </p>
         </div>
@@ -286,25 +380,77 @@ const filteredList = computed(() => {
     <div v-if="view === 'list'" class="flex-1 overflow-y-auto">
       <div class="max-w-4xl mx-auto px-6 py-6">
         <!-- Tabs -->
-        <div class="flex items-center gap-1 rounded-lg bg-muted p-1 mb-6 w-fit">
-          <button
-            @click="activeTab = 'prep'"
-            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'prep' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
-          >
-            Prep
-          </button>
-          <button
-            @click="activeTab = 'content'"
-            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'content' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
-          >
-            Content
-          </button>
-          <button
-            @click="activeTab = 'pastoral'"
-            :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'pastoral' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
-          >
-            Pastoral
-          </button>
+        <div class="flex flex-col gap-3 mb-6">
+          <div class="flex items-center gap-1 rounded-lg bg-muted p-1 w-fit">
+            <button
+              @click="activeTab = 'prep'"
+              :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'prep' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
+            >
+              Prep
+            </button>
+            <button
+              @click="activeTab = 'content'"
+              :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'content' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
+            >
+              Content
+            </button>
+            <button
+              @click="activeTab = 'pastoral'"
+              :class="['rounded-md px-3 py-1.5 text-sm font-medium transition-all', activeTab === 'pastoral' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground']"
+            >
+              Pastoral
+            </button>
+          </div>
+
+          <!-- Sub-filters for Prep -->
+          <div v-if="activeTab === 'prep'" class="flex items-center gap-4 px-2">
+            <button 
+              @click="prepFilter = 'all'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', prepFilter === 'all' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              All
+            </button>
+            <button 
+              @click="prepFilter = 'series'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', prepFilter === 'series' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Series
+            </button>
+            <button 
+              @click="prepFilter = 'research'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', prepFilter === 'research' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Research
+            </button>
+            <button 
+              @click="prepFilter = 'brainstorm'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', prepFilter === 'brainstorm' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Brainstorm
+            </button>
+          </div>
+
+          <!-- Sub-filters for Pastoral -->
+          <div v-if="activeTab === 'pastoral'" class="flex items-center gap-4 px-2">
+            <button 
+              @click="pastoralFilter = 'all'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', pastoralFilter === 'all' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              All
+            </button>
+            <button 
+              @click="pastoralFilter = 'devotional'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', pastoralFilter === 'devotional' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Devotionals
+            </button>
+            <button 
+              @click="pastoralFilter = 'agenda'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', pastoralFilter === 'agenda' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Agendas
+            </button>
+          </div>
         </div>
 
         <!-- Empty state -->
@@ -346,13 +492,21 @@ const filteredList = computed(() => {
           <button
             v-for="item in filteredList"
             :key="item.id"
-            @click="router.push(item.type === 'series' ? `/notebook/${item.id}` : item.type === 'research' ? `/notebook/research/${item.id}` : `/notebook/brainstorm/${item.id}`)"
+            @click="router.push(
+              item.type === 'series' ? `/notebook/${item.id}`
+              : item.type === 'research' ? `/notebook/research/${item.id}`
+              : item.type === 'brainstorm' ? `/notebook/brainstorm/${item.id}`
+              : item.type === 'agenda' ? `/notebook/agenda/${item.id}`
+              : `/notebook/devotional/${item.id}`
+            )"
             class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
             <div class="mt-0.5 shrink-0">
               <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', getTypeBadge(item.type).color]">
                 <BookOpen v-if="item.type === 'series'" class="h-5 w-5" />
                 <Search v-else-if="item.type === 'research'" class="h-5 w-5" />
+                <CalendarDays v-else-if="item.type === 'agenda'" class="h-5 w-5" />
+                <Heart v-else-if="item.type === 'devotional'" class="h-5 w-5" />
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
@@ -641,6 +795,112 @@ const filteredList = computed(() => {
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">Brief not found</h3>
             <p class="text-sm text-muted-foreground">This brief may have been deleted.</p>
+          </div>
+          <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agenda Detail View -->
+    <div v-else-if="view === 'agenda'" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+        <div v-if="agendaDetailLoading" class="flex items-center justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
+        <div v-else-if="agendaDetail" class="space-y-6">
+          <!-- Title + actions -->
+          <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ agendaDetail.meetingType }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700">Agenda</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="handleDelete('agenda', agendaDetail._id)"
+                :disabled="deletingId === agendaDetail._id"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <!-- Markdown content -->
+          <div v-if="agendaDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground">
+            <div v-html="marked.parse(agendaDetail.content)" />
+          </div>
+
+          <!-- Metadata -->
+          <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
+            <span v-if="agendaDetail.createdAt">Created {{ formatDate(agendaDetail.createdAt) }}</span>
+            <span v-if="agendaDetail.updatedAt && agendaDetail.updatedAt !== agendaDetail.createdAt">Updated {{ formatDate(agendaDetail.updatedAt) }}</span>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col items-center justify-center py-20 space-y-4">
+          <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+            <CalendarDays class="h-8 w-8 text-muted-foreground" />
+          </div>
+          <div class="text-center space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">Agenda not found</h3>
+            <p class="text-sm text-muted-foreground">This agenda may have been deleted.</p>
+          </div>
+          <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Devotional Detail View -->
+    <div v-else-if="view === 'devotional'" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+        <div v-if="devotionalDetailLoading" class="flex items-center justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
+        <div v-else-if="devotionalDetail" class="space-y-6">
+          <!-- Title + actions -->
+          <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ devotionalDetail.scriptureRef }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-violet-100 text-violet-700">Devotional</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="handleDelete('devotional', devotionalDetail._id)"
+                :disabled="deletingId === devotionalDetail._id"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <!-- Markdown content -->
+          <div v-if="devotionalDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground prose-blockquote:border-l-4 prose-blockquote:border-violet-300 prose-blockquote:pl-4 prose-blockquote:text-muted-foreground prose-blockquote:not-italic">
+            <div v-html="marked.parse(devotionalDetail.content)" />
+          </div>
+
+          <!-- Metadata -->
+          <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
+            <span v-if="devotionalDetail.createdAt">Created {{ formatDate(devotionalDetail.createdAt) }}</span>
+            <span v-if="devotionalDetail.updatedAt && devotionalDetail.updatedAt !== devotionalDetail.createdAt">Updated {{ formatDate(devotionalDetail.updatedAt) }}</span>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col items-center justify-center py-20 space-y-4">
+          <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+            <Heart class="h-8 w-8 text-muted-foreground" />
+          </div>
+          <div class="text-center space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">Devotional not found</h3>
+            <p class="text-sm text-muted-foreground">This devotional may have been deleted.</p>
           </div>
           <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
         </div>

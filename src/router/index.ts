@@ -40,6 +40,16 @@ const routes = [
         component: () => import('@/pages/NotebookPage.vue'),
       },
       {
+        path: 'notebook/agenda/:agendaId',
+        name: 'notebook-agenda-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
+        path: 'notebook/devotional/:devotionalId',
+        name: 'notebook-devotional-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
         path: 'notebook/:id',
         name: 'notebook-detail',
         component: () => import('@/pages/NotebookPage.vue'),
