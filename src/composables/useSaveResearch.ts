@@ -9,6 +9,7 @@ export type SaveStatus = 'idle' | 'extracting' | 'preview' | 'saving' | 'saved' 
 export interface ResearchPreview {
   scriptureRef: string
   topicOrAngle: string
+  seriesId: string | null
   content: string
 }
 
@@ -32,6 +33,7 @@ export function useSaveResearch() {
       preview.value = {
         scriptureRef: data.scriptureRef ?? '',
         topicOrAngle: data.topicOrAngle ?? '',
+        seriesId: null,
         content: data.content ?? '',
       }
       status.value = 'preview'
@@ -52,6 +54,7 @@ export function useSaveResearch() {
       const noteId = await client.mutation('research/mutations:create' as any, {
         scriptureRef: data.scriptureRef,
         topicOrAngle: data.topicOrAngle || undefined,
+        seriesId: data.seriesId || undefined,
         content: data.content,
         status: 'draft',
       })

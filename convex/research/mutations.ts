@@ -6,6 +6,7 @@ export const create = mutation({
   args: {
     scriptureRef: v.string(),
     topicOrAngle: v.optional(v.string()),
+    seriesId: v.optional(v.id("series")),
     content: v.string(),
     status: v.optional(v.string()),
   },
@@ -18,6 +19,7 @@ export const create = mutation({
       userId,
       scriptureRef: args.scriptureRef,
       topicOrAngle: args.topicOrAngle,
+      seriesId: args.seriesId,
       content: args.content,
       status: args.status ?? "draft",
       createdAt: now,
@@ -33,6 +35,7 @@ export const update = mutation({
     noteId: v.id("researchNotes"),
     scriptureRef: v.optional(v.string()),
     topicOrAngle: v.optional(v.string()),
+    seriesId: v.optional(v.id("series")),
     content: v.optional(v.string()),
     status: v.optional(v.string()),
   },

@@ -95,12 +95,14 @@ export default defineSchema({
     userId: v.id("users"),
     scriptureRef: v.string(),
     topicOrAngle: v.optional(v.string()),
+    seriesId: v.optional(v.id("series")),
     content: v.optional(v.string()),
     status: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_series", ["seriesId"]),
 
   // Brainstorm session briefs — saved from the Sermon Brainstorm skill
   brainstormBriefs: defineTable({

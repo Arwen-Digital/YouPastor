@@ -160,6 +160,25 @@ async function handleDelete(type: 'series' | 'research' | 'brainstorm', id: stri
   deletingId.value = null
 }
 
+async function assignSeriesToResearch(noteId: string, seriesId: string | null) {
+  try {
+    const client = getConvexClient()
+    await client.mutation('research/mutations:update' as any, { noteId, seriesId })
+    // The subscription will auto-update the detail view
+  } catch (err) {
+    console.error('Failed to assign series:', err)
+  }
+}
+
+async function assignSeriesToBrainstorm(briefId: string, seriesId: string | null) {
+  try {
+    const client = getConvexClient()
+    await client.mutation('brainstorm/mutations:update' as any, { briefId, seriesId })
+  } catch (err) {
+    console.error('Failed to assign series:', err)
+  }
+}
+
 function formatDate(ts: number | undefined): string {
   if (!ts) return ''
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -190,6 +209,12 @@ function getTypeBadge(type: string): { label: string; color: string } {
     case 'brainstorm': return { label: 'Brainstorm', color: 'bg-amber-500/10 text-amber-600' }
     default: return { label: type, color: 'bg-muted text-muted-foreground' }
   }
+}
+
+function getSeriesName(seriesId: string | undefined): string {
+  if (!seriesId) return ''
+  const s = seriesList.value.find((s: any) => s._id === seriesId)
+  return s?.title ?? ''
 }
 
 // Combined list for ordering by date
@@ -459,6 +484,20 @@ const filteredList = computed(() => {
             </div>
           </div>
 
+          <!-- Series assignment -->
+          <div class="space-y-1.5">
+            <label class="text-sm font-medium text-foreground">Linked Series</label>
+            <select
+              :value="researchDetail.seriesId ?? null"
+              @change="assignSeriesToResearch(researchDetail._id, ($event.target as HTMLSelectElement).value || null)"
+              class="flex h-9 w-full rounded-md border border-input bg-card px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option :value="null">Standalone Research (no series)</option>
+              <option v-for="s in seriesList" :key="s._id" :value="s._id">{{ s.title }}</option>
+            </select>
+            <p v-if="researchDetail.seriesId" class="text-xs text-muted-foreground">Linked to <span class="font-medium">{{ getSeriesName(researchDetail.seriesId) }}</span></p>
+          </div>
+
           <!-- Markdown content -->
           <div v-if="researchDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground prose-table:my-3 prose-table:text-sm prose-th:px-3 prose-th:py-2 prose-th:bg-muted/50 prose-th:font-medium prose-td:px-3 prose-td:py-1.5 prose-td:border-t prose-td:border-border prose-code:text-xs prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
             <div v-html="marked.parse(researchDetail.content)" />
@@ -511,6 +550,20 @@ const filteredList = computed(() => {
             </div>
           </div>
 
+          <!-- Series assignment -->
+          <div class="space-y-1.5">
+            <label class="text-sm font-medium text-foreground">Linked Series</label>
+            <select
+              :value="brainstormDetail.seriesId ?? null"
+              @change="assignSeriesToBrainstorm(brainstormDetail._id, ($event.target as HTMLSelectElement).value || null)"
+              class="flex h-9 w-full rounded-md border border-input bg-card px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option :value="null">Standalone Message (no series)</option>
+              <option v-for="s in seriesList" :key="s._id" :value="s._id">{{ s.title }}</option>
+            </select>
+            <p v-if="brainstormDetail.seriesId" class="text-xs text-muted-foreground">Linked to <span class="font-medium">{{ getSeriesName(brainstormDetail.seriesId) }}</span></p>
+          </div>
+
           <!-- Markdown content -->
           <div v-if="brainstormDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground prose-table:my-3 prose-table:text-sm prose-th:px-3 prose-th:py-2 prose-th:bg-muted/50 prose-th:font-medium prose-td:px-3 prose-td:py-1.5 prose-td:border-t prose-td:border-border">
             <div v-html="marked.parse(brainstormDetail.content)" />
@@ -520,7 +573,6 @@ const filteredList = computed(() => {
           <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
             <span v-if="brainstormDetail.createdAt">Created {{ formatDate(brainstormDetail.createdAt) }}</span>
             <span v-if="brainstormDetail.updatedAt && brainstormDetail.updatedAt !== brainstormDetail.createdAt">Updated {{ formatDate(brainstormDetail.updatedAt) }}</span>
-            <span v-if="brainstormDetail.seriesId" class="text-xs text-muted-foreground">Linked to series</span>
           </div>
         </div>
 

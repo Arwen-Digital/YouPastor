@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { X, Loader2, BookOpen, Check, AlertCircle } from 'lucide-vue-next'
 import { marked } from 'marked'
+import { getConvexClient } from '@/lib/convex'
 import type { ResearchPreview, SaveStatus } from '@/composables/useSaveResearch'
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -19,6 +20,25 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'retry'): void
 }>()
+
+// Series list for dropdown
+const seriesList = ref<any[]>([])
+let seriesUnsub: (() => void) | null = null
+
+onMounted(() => {
+  try {
+    const client = getConvexClient()
+    seriesUnsub = client.onUpdate('series/queries:listMine' as any, {}, (data: any) => {
+      seriesList.value = data ?? []
+    })
+  } catch (err) {
+    console.error('[SaveResearchModal] Failed to load series:', err)
+  }
+})
+
+onUnmounted(() => {
+  seriesUnsub?.()
+})
 
 const form = ref<ResearchPreview | null>(null)
 
@@ -120,6 +140,19 @@ function handleSave() {
         <p class="text-sm text-muted-foreground">
           Review your research before saving. This was extracted from your conversation with the AI.
         </p>
+
+        <!-- Series selector -->
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-foreground">Linked Series (optional)</label>
+          <select
+            v-model="form.seriesId"
+            class="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option :value="null">Standalone Research (no series)</option>
+            <option v-for="s in seriesList" :key="s._id" :value="s._id">{{ s.title }}</option>
+          </select>
+          <p class="text-xs text-muted-foreground">Link this research to a sermon series, or keep it standalone.</p>
+        </div>
 
         <!-- Scripture Reference -->
         <div class="space-y-1.5">
