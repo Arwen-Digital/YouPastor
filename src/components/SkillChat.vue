@@ -70,6 +70,32 @@ NEVER produce the sermon brief yourself. Your only job is intake.`
 
 const RESEARCHER_HANDOFF_NOTE = `\n\nIMPORTANT: The conversation below already contains the pastor's passage and context (marked by RESEARCH_READY). Do not ask follow-up questions. Produce the full 7-section research output immediately based on the information shared.`
 
+const YOUTUBE_INTAKE_PROMPT = `You are a conversational intake assistant for the Sermon to YouTube skill.
+
+Your goal is to gather only the minimum details needed before full YouTube package generation.
+
+Collect these inputs one at a time:
+1. Source material confirmation (blog content or sermon notes/transcript)
+2. Sermon/video length (optional if unknown)
+3. Key moment that landed strongest
+4. Primary search query / discovery angle
+5. Optional channel/about text
+
+Rules:
+- Ask EXACTLY ONE question per message.
+- Never ask multiple questions in one turn.
+- Keep each intake message brief (1-2 sentences).
+- Wait for the pastor's reply before asking the next question.
+- Skip any inputs already clearly provided.
+- Do not generate titles/descriptions/tags/thumbnails during intake.
+
+When enough info is collected, respond with a message that starts exactly with:
+"YOUTUBE_READY:"
+Then provide a short one-paragraph summary of collected inputs.
+
+Example:
+"YOUTUBE_READY: Source: selected blog post. Length: ~42 minutes. Key moment: the wilderness trust story. Search angle: how to trust God when life falls apart. About text: not provided."`
+
 const props = defineProps<{
   skillSlug: string
   title: string
@@ -91,6 +117,7 @@ const isMeetingAgenda = props.skillSlug === 'meeting-agenda'
 const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
 const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
 const isSermonToYoutube = props.skillSlug === 'sermon-to-youtube'
+const isYoutubeInIntake = ref(isSermonToYoutube)
 const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube
 
 // Series save flow
@@ -229,15 +256,24 @@ const brainstormIntakePrompt = computed(() => {
     : ''
   return ctxBlock ? `${BRAINSTORM_INTAKE_PROMPT}\n\n---\n\n${ctxBlock}` : BRAINSTORM_INTAKE_PROMPT
 })
+const youtubeIntakePrompt = computed(() => {
+  const ctx = churchContext.value
+  const ctxBlock = (ctx.churchName || ctx.pastorName)
+    ? buildContextBlock(ctx)
+    : ''
+  return ctxBlock ? `${YOUTUBE_INTAKE_PROMPT}\n\n---\n\n${ctxBlock}` : YOUTUBE_INTAKE_PROMPT
+})
 const currentSystemPrompt = ref(
   isSermonResearch ? intakePrompt.value
   : isSermonBrainstorm ? brainstormIntakePrompt.value
+  : isSermonToYoutube ? youtubeIntakePrompt.value
   : baseSystemPrompt.value
 )
 
 // Update system prompt when church profile loads or changes
 watch(baseSystemPrompt, (newPrompt) => {
-  // Only update if we're past the intake phase (not using intake prompt anymore)
+  // Only update if we're past intake phases
+  if (isSermonToYoutube && isYoutubeInIntake.value) return
   if (role.value !== 'orchestrator' || (!isSermonResearch && !isSermonBrainstorm)) {
     currentSystemPrompt.value = newPrompt
   }
@@ -254,6 +290,12 @@ watch(intakePrompt, (newPrompt) => {
 // Update brainstorm intake prompt when church profile loads
 watch(brainstormIntakePrompt, (newPrompt) => {
   if (role.value === 'orchestrator' && isSermonBrainstorm) {
+    currentSystemPrompt.value = newPrompt
+  }
+})
+
+watch(youtubeIntakePrompt, (newPrompt) => {
+  if (isSermonToYoutube && isYoutubeInIntake.value) {
     currentSystemPrompt.value = newPrompt
   }
 })
@@ -388,6 +430,11 @@ async function handleAssistantResponse(responseContent: string) {
   if (isSermonBrainstorm && role.value === 'orchestrator' && responseContent.includes('BRIEF_READY:')) {
     await handoffToBriefGenerator()
   }
+
+  // Detect youtube intake handoff and generate package
+  if (isSermonToYoutube && isYoutubeInIntake.value && responseContent.includes('YOUTUBE_READY:')) {
+    await handoffToYoutubePackager()
+  }
 }
 
 async function startConversation(userMessage: string) {
@@ -454,6 +501,24 @@ async function handoffToBriefGenerator() {
 
   // Add a user message to trigger the brief generation
   const triggerMsg = 'Please generate the Expanded Sermon Brief now.'
+  messages.value.push({ role: 'user', content: triggerMsg })
+  scrollToBottom()
+
+  await streamMessage(buildChatHistory() as any)
+
+  if (streamingContent.value) {
+    messages.value.push({ role: 'assistant', content: streamingContent.value })
+  }
+
+  scrollToBottom()
+}
+
+/** Switch from youtube intake to full youtube package generation */
+async function handoffToYoutubePackager() {
+  isYoutubeInIntake.value = false
+  currentSystemPrompt.value = baseSystemPrompt.value
+
+  const triggerMsg = 'Please generate the complete YouTube package now.'
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
