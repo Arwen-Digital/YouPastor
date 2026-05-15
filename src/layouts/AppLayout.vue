@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -28,6 +28,7 @@ import {
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const hideSidebar = computed(() => route.meta.hideSidebar === true)
 
 async function handleSignOut() {
   await auth.signOut()
@@ -107,7 +108,8 @@ function navigateTo(path: string) {
 
 <template>
   <div class="flex h-screen bg-background">
-    <aside class="w-[260px] flex flex-col bg-muted/50">
+    <transition name="sidebar-slide">
+      <aside v-if="!hideSidebar" class="w-[260px] flex flex-col bg-muted/50 shrink-0">
       <div class="px-3 pt-3 pb-2">
         <button
           v-for="item in topNav"
@@ -196,9 +198,10 @@ function navigateTo(path: string) {
           Sign Out
         </button>
       </div>
-    </aside>
+      </aside>
+    </transition>
 
-    <main class="flex-1 overflow-hidden">
+    <main class="flex-1 overflow-hidden transition-all duration-300">
       <router-view v-slot="{ Component }">
         <transition
           name="page-slide"
@@ -212,6 +215,24 @@ function navigateTo(path: string) {
 </template>
 
 <style scoped>
+.sidebar-slide-enter-active,
+.sidebar-slide-leave-active {
+  transition: width 220ms ease, opacity 180ms ease, transform 220ms ease;
+  overflow: hidden;
+}
+.sidebar-slide-enter-from,
+.sidebar-slide-leave-to {
+  width: 0;
+  opacity: 0;
+  transform: translateX(-16px);
+}
+.sidebar-slide-enter-to,
+.sidebar-slide-leave-from {
+  width: 260px;
+  opacity: 1;
+  transform: translateX(0);
+}
+
 .page-slide-enter-active {
   transition: opacity 200ms ease-out, transform 200ms ease-out;
 }
