@@ -82,6 +82,8 @@ const seriesResearchNotes = ref<any[]>([])
 let seriesResearchUnsub: (() => void) | null = null
 const seriesBrainstormBriefs = ref<any[]>([])
 let seriesBrainstormUnsub: (() => void) | null = null
+const seriesSermons = ref<any[]>([])
+let seriesSermonsUnsub: (() => void) | null = null
 
 // ── Active tab for list view ──
 const activeTab = ref<'prep' | 'content' | 'pastoral'>(
@@ -139,12 +141,19 @@ onUnmounted(() => {
   devotionalDetailUnsub?.()
   seriesResearchUnsub?.()
   seriesBrainstormUnsub?.()
+  seriesSermonsUnsub?.()
 })
 
 // Watch series ID
 watch(selectedSeriesId, async (newId) => {
   if (detailUnsub) { detailUnsub(); detailUnsub = null }
+  if (seriesResearchUnsub) { seriesResearchUnsub(); seriesResearchUnsub = null }
+  if (seriesBrainstormUnsub) { seriesBrainstormUnsub(); seriesBrainstormUnsub = null }
+  if (seriesSermonsUnsub) { seriesSermonsUnsub(); seriesSermonsUnsub = null }
   seriesDetail.value = null
+  seriesResearchNotes.value = []
+  seriesBrainstormBriefs.value = []
+  seriesSermons.value = []
   if (!newId) return
   detailLoading.value = true
   try {
@@ -160,6 +169,10 @@ watch(selectedSeriesId, async (newId) => {
     // Load brainstorm briefs linked to this series
     seriesBrainstormUnsub = client.onUpdate('brainstorm/queries:getBySeriesId' as any, { seriesId: newId }, (data: any) => {
       seriesBrainstormBriefs.value = data ?? []
+    })
+    // Load sermons linked to this series
+    seriesSermonsUnsub = client.onUpdate('sermons/queries:getBySeriesId' as any, { seriesId: newId }, (data: any) => {
+      seriesSermons.value = data ?? []
     })
   } catch (err) {
     console.error('Failed to load series:', err)
@@ -631,6 +644,30 @@ const filteredList = computed(() => {
             </div>
           </div>
 
+          <!-- Linked Sermons -->
+          <div v-if="seriesSermons.length > 0" class="space-y-3">
+            <h3 class="text-sm font-medium text-foreground">Sermons <span class="text-muted-foreground font-normal">({{ seriesSermons.length }})</span></h3>
+            <div class="space-y-2">
+              <button
+                v-for="sermon in seriesSermons" :key="sermon._id"
+                @click="router.push(`/sermons/edit/sermon/${sermon._id}`)"
+                class="w-full group flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-all hover:border-primary/30 hover:shadow-sm"
+              >
+                <div class="shrink-0 h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <BookOpen class="h-4 w-4 text-primary" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-foreground truncate">{{ sermon.title || 'Untitled sermon' }}</div>
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span v-if="sermon.scriptureRef">{{ sermon.scriptureRef }}</span>
+                    <span v-if="sermon.scriptureRef">•</span>
+                    <span>{{ formatDate(sermon.createdAt) }}</span>
+                  </div>
+                </div>
+                <ChevronRight class="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+              </button>
+            </div>
+          </div>
 
           <!-- Linked Research Notes -->
           <div v-if="seriesResearchNotes.length > 0" class="space-y-3">
