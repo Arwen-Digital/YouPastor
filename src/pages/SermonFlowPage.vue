@@ -8,17 +8,26 @@ const route = useRoute()
 const router = useRouter()
 
 const action = computed(() => route.params.action as 'create' | 'edit')
-const mode = computed(() => route.params.mode as 'series' | 'standalone')
+const mode = computed(() => route.params.mode as 'series' | 'standalone' | 'sermon')
 const seriesId = computed(() => route.params.seriesId as string | undefined)
+const sermonId = computed(() => mode.value === 'sermon' ? seriesId.value : undefined)
 
 const { result: seriesList, isLoading: seriesLoading } = useConvexQuery('series/queries:listMine' as any)
+const { result: selectedSermon, isLoading: sermonLoading } = useConvexQuery(
+  'sermons/queries:getById' as any,
+  { sermonId: sermonId.value }
+)
 const selectedSeries = computed(() => {
   if (mode.value !== 'series' || !seriesId.value) return null
   return (seriesList.value ?? []).find((series: any) => series._id === seriesId.value) ?? null
 })
 
 const actionLabel = computed(() => action.value === 'edit' ? 'Edit Sermon' : 'Create Sermon')
-const modeLabel = computed(() => mode.value === 'series' ? 'Series Message' : 'Standalone Message')
+const modeLabel = computed(() => {
+  if (mode.value === 'series') return 'Series Message'
+  if (mode.value === 'sermon') return 'Saved Sermon'
+  return 'Standalone Message'
+})
 const pageTitle = computed(() => `${actionLabel.value} — ${modeLabel.value}`)
 </script>
 
@@ -83,6 +92,28 @@ const pageTitle = computed(() => `${actionLabel.value} — ${modeLabel.value}`)
 
           <div v-else class="text-sm text-muted-foreground">
             Selected series could not be found.
+          </div>
+        </div>
+
+        <div v-else-if="mode === 'sermon'" class="rounded-xl border border-border bg-background p-4 space-y-2">
+          <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <FileText class="h-3.5 w-3.5" />
+            Selected Sermon
+          </div>
+
+          <div v-if="sermonLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 class="h-4 w-4 animate-spin" />
+            Loading selected sermon...
+          </div>
+
+          <div v-else-if="selectedSermon" class="space-y-1">
+            <div class="text-base font-semibold text-foreground">{{ selectedSermon.title || 'Untitled sermon' }}</div>
+            <p v-if="selectedSermon.scriptureRef" class="text-sm text-muted-foreground">{{ selectedSermon.scriptureRef }}</p>
+            <p v-if="selectedSermon.content" class="text-xs text-muted-foreground line-clamp-3">{{ selectedSermon.content }}</p>
+          </div>
+
+          <div v-else class="text-sm text-muted-foreground">
+            Selected sermon could not be found.
           </div>
         </div>
 

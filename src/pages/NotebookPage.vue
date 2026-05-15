@@ -40,6 +40,10 @@ let researchListUnsub: (() => void) | null = null
 const brainstormList = ref<any[]>([])
 let brainstormListUnsub: (() => void) | null = null
 
+// ── Sermons list ──
+const sermonList = ref<any[]>([])
+let sermonListUnsub: (() => void) | null = null
+
 // ── Agendas list ──
 const agendaList = ref<any[]>([])
 let agendaListUnsub: (() => void) | null = null
@@ -80,8 +84,14 @@ const seriesBrainstormBriefs = ref<any[]>([])
 let seriesBrainstormUnsub: (() => void) | null = null
 
 // ── Active tab for list view ──
-const activeTab = ref<'prep' | 'content' | 'pastoral'>('prep')
-const prepFilter = ref<'all' | 'series' | 'research' | 'brainstorm'>('all')
+const activeTab = ref<'prep' | 'content' | 'pastoral'>(
+  route.query.tab === 'content' || route.query.tab === 'pastoral' ? route.query.tab : 'prep'
+)
+const prepFilter = ref<'all' | 'sermon' | 'series' | 'research' | 'brainstorm'>(
+  route.query.filter === 'sermon' || route.query.filter === 'series' || route.query.filter === 'research' || route.query.filter === 'brainstorm'
+    ? route.query.filter
+    : 'all'
+)
 const pastoralFilter = ref<'all' | 'devotional' | 'agenda'>('all')
 
 // ── Deleting ──
@@ -100,6 +110,9 @@ onMounted(async () => {
     brainstormListUnsub = client.onUpdate('brainstorm/queries:listMine' as any, {}, (data: any) => {
       brainstormList.value = data ?? []
     })
+    sermonListUnsub = client.onUpdate('sermons/queries:listMine' as any, {}, (data: any) => {
+      sermonList.value = data ?? []
+    })
     agendaListUnsub = client.onUpdate('agendas/queries:listMine' as any, {}, (data: any) => {
       agendaList.value = data ?? []
     })
@@ -116,6 +129,7 @@ onUnmounted(() => {
   listUnsub?.()
   researchListUnsub?.()
   brainstormListUnsub?.()
+  sermonListUnsub?.()
   agendaListUnsub?.()
   devotionalListUnsub?.()
   detailUnsub?.()
@@ -296,6 +310,7 @@ function getStatusLabel(status: string | undefined): string {
 
 function getTypeBadge(type: string): { label: string; color: string } {
   switch (type) {
+    case 'sermon': return { label: 'Sermon', color: 'bg-slate-500/10 text-slate-700' }
     case 'series': return { label: 'Series', color: 'bg-primary/10 text-primary' }
     case 'research': return { label: 'Research', color: 'bg-blue-500/10 text-blue-600' }
     case 'brainstorm': return { label: 'Brainstorm', color: 'bg-amber-500/10 text-amber-600' }
@@ -314,7 +329,7 @@ function getSeriesName(seriesId: string | undefined): string {
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
-    type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional'
+    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional'
     id: string
     title: string
     subtitle: string
@@ -322,6 +337,7 @@ const combinedList = computed(() => {
     status: string
     tab: 'prep' | 'content' | 'pastoral'
   }> = [
+    ...sermonList.value.map(s => ({ type: 'sermon' as const, id: s._id, title: s.title || 'Untitled sermon', subtitle: s.scriptureRef || '', date: s.createdAt || 0, status: s.status || 'draft', tab: 'prep' as const })),
     ...seriesList.value.map(s => ({ type: 'series' as const, id: s._id, title: s.title, subtitle: s.tagline || '', date: s.createdAt || 0, status: s.status || 'draft', tab: 'prep' as const })),
     ...researchList.value.map(r => ({ type: 'research' as const, id: r._id, title: r.scriptureRef, subtitle: r.topicOrAngle || '', date: r.createdAt || 0, status: r.status || 'draft', tab: 'prep' as const })),
     ...brainstormList.value.map(b => ({ type: 'brainstorm' as const, id: b._id, title: b.passage, subtitle: b.bigIdea || '', date: b.createdAt || 0, status: b.status || 'draft', tab: 'prep' as const })),
@@ -411,6 +427,12 @@ const filteredList = computed(() => {
               All
             </button>
             <button 
+              @click="prepFilter = 'sermon'" 
+              :class="['text-xs font-medium transition-colors hover:text-foreground', prepFilter === 'sermon' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Sermons
+            </button>
+            <button 
               @click="prepFilter = 'series'" 
               :class="['text-xs font-medium transition-colors hover:text-foreground', prepFilter === 'series' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
             >
@@ -467,7 +489,7 @@ const filteredList = computed(() => {
             <p class="text-sm text-muted-foreground max-w-sm">
               {{
                 activeTab === 'prep'
-                  ? 'When you save a brainstorm, research, or series plan, it will appear here.'
+                  ? 'When you save a sermon, brainstorm, research, or series plan, it will appear here.'
                   : activeTab === 'content'
                   ? 'Content from Blog, YouTube, Social, and Email tools will appear here.'
                   : 'Pastoral items like agendas and devotionals will appear here.'
@@ -493,7 +515,8 @@ const filteredList = computed(() => {
             v-for="item in filteredList"
             :key="item.id"
             @click="router.push(
-              item.type === 'series' ? `/notebook/${item.id}`
+              item.type === 'sermon' ? `/sermons/edit/sermon/${item.id}`
+              : item.type === 'series' ? `/notebook/${item.id}`
               : item.type === 'research' ? `/notebook/research/${item.id}`
               : item.type === 'brainstorm' ? `/notebook/brainstorm/${item.id}`
               : item.type === 'agenda' ? `/notebook/agenda/${item.id}`
@@ -503,7 +526,7 @@ const filteredList = computed(() => {
           >
             <div class="mt-0.5 shrink-0">
               <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', getTypeBadge(item.type).color]">
-                <BookOpen v-if="item.type === 'series'" class="h-5 w-5" />
+                <BookOpen v-if="item.type === 'sermon' || item.type === 'series'" class="h-5 w-5" />
                 <Search v-else-if="item.type === 'research'" class="h-5 w-5" />
                 <CalendarDays v-else-if="item.type === 'agenda'" class="h-5 w-5" />
                 <Heart v-else-if="item.type === 'devotional'" class="h-5 w-5" />
