@@ -61,7 +61,7 @@ interface NavItem {
 const topNav: NavItem[] = [
   { label: 'Home', icon: Home, path: '/' },
   { label: 'Notebook', icon: Notebook, path: '/notebook' },
-  { label: 'Sermons', icon: BookOpen, path: '/sermons' },
+  { label: 'Create Sermons', icon: BookOpen, path: '/sermons' },
 ]
 
 const workspaceSections: NavItem[] = [

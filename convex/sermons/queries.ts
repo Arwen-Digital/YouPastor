@@ -42,3 +42,23 @@ export const getById = query({
     return sermon
   },
 })
+
+export const getBySeriesId = query({
+  args: { seriesId: v.id("series") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx)
+    if (!userId) return []
+
+    const series = await ctx.db.get(args.seriesId)
+    if (!series || series.userId !== userId) return []
+
+    const sermons = await ctx.db
+      .query("sermons")
+      .withIndex("by_series", (q) => q.eq("seriesId", args.seriesId))
+      .collect()
+
+    return sermons
+      .filter((sermon) => sermon.userId === userId)
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+  },
+})

@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Eye,
+  FileText,
   Italic,
   Layers,
   List,
@@ -42,9 +43,11 @@ const seriesDetail = ref<any>(null)
 const seriesLoading = ref(false)
 const brainstormBriefs = ref<any[]>([])
 const researchNotes = ref<any[]>([])
+const seriesSermons = ref<any[]>([])
 let seriesUnsub: (() => void) | null = null
 let brainstormUnsub: (() => void) | null = null
 let researchUnsub: (() => void) | null = null
+let seriesSermonsUnsub: (() => void) | null = null
 
 const activeTab = ref<'series' | 'brainstorm' | 'research'>('series')
 const selectedBrainstorm = ref<any>(null)
@@ -121,12 +124,15 @@ watch(resourceSeriesId, (seriesId) => {
   seriesUnsub?.()
   brainstormUnsub?.()
   researchUnsub?.()
+  seriesSermonsUnsub?.()
   seriesUnsub = null
   brainstormUnsub = null
   researchUnsub = null
+  seriesSermonsUnsub = null
   seriesDetail.value = null
   brainstormBriefs.value = []
   researchNotes.value = []
+  seriesSermons.value = []
   selectedBrainstorm.value = null
   selectedResearch.value = null
 
@@ -144,6 +150,9 @@ watch(resourceSeriesId, (seriesId) => {
   researchUnsub = client.onUpdate('research/queries:getBySeriesId' as any, { seriesId }, (data: any) => {
     researchNotes.value = data ?? []
   })
+  seriesSermonsUnsub = client.onUpdate('sermons/queries:getBySeriesId' as any, { seriesId }, (data: any) => {
+    seriesSermons.value = data ?? []
+  })
 }, { immediate: true })
 
 onBeforeUnmount(() => {
@@ -151,6 +160,7 @@ onBeforeUnmount(() => {
   seriesUnsub?.()
   brainstormUnsub?.()
   researchUnsub?.()
+  seriesSermonsUnsub?.()
 })
 
 function renderMarkdown(content?: string): string {
@@ -189,6 +199,10 @@ function selectBrainstorm(brief: any) {
 
 function selectResearch(note: any) {
   selectedResearch.value = note
+}
+
+function openSermon(sermon: any) {
+  router.push(`/sermons/edit/sermon/${sermon._id}`)
 }
 
 async function handleSave() {
@@ -375,6 +389,38 @@ async function handleSave() {
                 <div v-if="seriesDetail.series.seriesArc" class="rounded-xl border border-border bg-card p-5 space-y-2">
                   <h3 class="text-sm font-semibold text-foreground">Series Arc</h3>
                   <p class="text-sm leading-relaxed text-muted-foreground">{{ seriesDetail.series.seriesArc }}</p>
+                </div>
+
+                <div class="rounded-xl border border-border bg-card p-5 space-y-3">
+                  <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <FileText class="h-3.5 w-3.5" />
+                    Sermons in this series
+                  </div>
+
+                  <div v-if="seriesSermons.length" class="space-y-2">
+                    <button
+                      v-for="sermon in seriesSermons"
+                      :key="sermon._id"
+                      @click="openSermon(sermon)"
+                      class="group w-full rounded-lg bg-muted/50 p-3 text-left transition-colors hover:bg-muted"
+                    >
+                      <div class="flex items-start gap-3">
+                        <div class="flex-1 min-w-0">
+                          <div class="text-sm font-medium text-foreground truncate">{{ sermon.title || 'Untitled sermon' }}</div>
+                          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <span v-if="sermon.scriptureRef">{{ sermon.scriptureRef }}</span>
+                            <span v-if="sermon.scriptureRef">•</span>
+                            <span>{{ formatDate(sermon.createdAt) }}</span>
+                          </div>
+                        </div>
+                        <ChevronRight class="mt-1 h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+                      </div>
+                    </button>
+                  </div>
+
+                  <p v-else class="text-sm text-muted-foreground">
+                    No sermons have been created under this series yet.
+                  </p>
                 </div>
 
                 <div v-if="seriesDetail.weeks?.length" class="rounded-xl border border-border bg-card p-5 space-y-3">
