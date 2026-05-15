@@ -136,10 +136,21 @@ watch(resourceSeriesId, (seriesId) => {
   selectedBrainstorm.value = null
   selectedResearch.value = null
 
-  if (!seriesId) return
+  const client = getConvexClient()
+
+  if (!seriesId) {
+    seriesLoading.value = false
+    if (activeTab.value === 'series') activeTab.value = 'brainstorm'
+    brainstormUnsub = client.onUpdate('brainstorm/queries:listMine' as any, {}, (data: any) => {
+      brainstormBriefs.value = (data ?? []).slice(0, 5)
+    })
+    researchUnsub = client.onUpdate('research/queries:listMine' as any, {}, (data: any) => {
+      researchNotes.value = (data ?? []).slice(0, 5)
+    })
+    return
+  }
 
   seriesLoading.value = true
-  const client = getConvexClient()
   seriesUnsub = client.onUpdate('series/queries:getWithWeeks' as any, { seriesId }, (data: any) => {
     seriesDetail.value = data
     seriesLoading.value = false
@@ -343,6 +354,7 @@ async function handleSave() {
           <div class="shrink-0 border-b border-border px-4 pt-4">
             <div class="flex rounded-lg bg-muted p-1">
               <button
+                v-if="resourceSeriesId"
                 @click="activeTab = 'series'; clearSelectedResource()"
                 :class="['resource-tab', activeTab === 'series' ? 'resource-tab-active' : '']"
               >
@@ -462,10 +474,14 @@ async function handleSave() {
               </div>
 
               <template v-else>
-                <div v-if="!resourceSeriesId" class="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                  Brainstorm briefs appear here when this sermon is linked to a series.
+                <div v-if="!resourceSeriesId" class="rounded-xl border border-border bg-card p-4 space-y-1">
+                  <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <Sparkles class="h-3.5 w-3.5" />
+                    Latest brainstorms
+                  </div>
+                  <p class="text-sm text-muted-foreground">Showing the 5 most recent brainstorm briefs from your notebook.</p>
                 </div>
-                <div v-else-if="brainstormBriefs.length" class="space-y-2">
+                <div v-if="brainstormBriefs.length" class="space-y-2">
                   <button
                     v-for="brief in brainstormBriefs"
                     :key="brief._id"
@@ -484,7 +500,7 @@ async function handleSave() {
                   </button>
                 </div>
                 <div v-else class="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                  No brainstorm briefs are linked to this series yet.
+                  {{ resourceSeriesId ? 'No brainstorm briefs are linked to this series yet.' : 'No brainstorm briefs found yet.' }}
                 </div>
               </template>
             </div>
@@ -508,10 +524,14 @@ async function handleSave() {
               </div>
 
               <template v-else>
-                <div v-if="!resourceSeriesId" class="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                  Research notes appear here when this sermon is linked to a series.
+                <div v-if="!resourceSeriesId" class="rounded-xl border border-border bg-card p-4 space-y-1">
+                  <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <Search class="h-3.5 w-3.5" />
+                    Latest research
+                  </div>
+                  <p class="text-sm text-muted-foreground">Showing the 5 most recent research notes from your notebook.</p>
                 </div>
-                <div v-else-if="researchNotes.length" class="space-y-2">
+                <div v-if="researchNotes.length" class="space-y-2">
                   <button
                     v-for="note in researchNotes"
                     :key="note._id"
@@ -530,7 +550,7 @@ async function handleSave() {
                   </button>
                 </div>
                 <div v-else class="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                  No research notes are linked to this series yet.
+                  {{ resourceSeriesId ? 'No research notes are linked to this series yet.' : 'No research notes found yet.' }}
                 </div>
               </template>
             </div>
