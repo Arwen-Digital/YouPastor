@@ -268,6 +268,10 @@ function getHostname(url: string): string {
   }
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '').trim()
+}
+
 const renderedStreaming = computed(() => {
   if (!streamingContent.value) return ''
   return marked.parse(streamingContent.value) as string
@@ -593,7 +597,7 @@ function handleSaveModalClose() {
                   <span>{{ formatDate(sermon.createdAt) }}</span>
                 </div>
                 <p v-if="sermon.content" class="text-xs text-muted-foreground line-clamp-2 pt-1">
-                  {{ sermon.content.slice(0, 180) }}{{ sermon.content.length > 180 ? '...' : '' }}
+                  {{ stripHtml(sermon.content).slice(0, 180) }}{{ stripHtml(sermon.content).length > 180 ? '...' : '' }}
                 </p>
               </div>
               <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize group-hover:bg-primary/10 group-hover:text-primary">
