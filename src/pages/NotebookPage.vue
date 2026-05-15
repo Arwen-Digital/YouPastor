@@ -116,8 +116,25 @@ const prepFilter = ref<'all' | 'sermon' | 'series' | 'research' | 'brainstorm'>(
     ? route.query.filter
     : 'all'
 )
-const contentFilter = ref<'all' | 'blog' | 'youtube'>(
-  route.query.filter === 'blog' || route.query.filter === 'youtube'
+const contentFilter = ref<
+  | 'all'
+  | 'blog'
+  | 'youtube'
+  | 'smallGroupQuestions'
+  | 'churchSocialPost'
+  | 'socialMediaCalendar'
+  | 'churchEmail'
+  | 'announcementScript'
+  | 'churchLetter'
+>(
+  route.query.filter === 'blog'
+  || route.query.filter === 'youtube'
+  || route.query.filter === 'smallGroupQuestions'
+  || route.query.filter === 'churchSocialPost'
+  || route.query.filter === 'socialMediaCalendar'
+  || route.query.filter === 'churchEmail'
+  || route.query.filter === 'announcementScript'
+  || route.query.filter === 'churchLetter'
     ? route.query.filter
     : 'all'
 )
@@ -557,7 +574,7 @@ const filteredList = computed(() => {
           </div>
 
           <!-- Sub-filters for Content -->
-          <div v-if="activeTab === 'content'" class="flex items-center gap-4 px-2">
+          <div v-if="activeTab === 'content'" class="flex items-center gap-4 px-2 flex-wrap">
             <button
               @click="contentFilter = 'all'"
               :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'all' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
@@ -575,6 +592,42 @@ const filteredList = computed(() => {
               :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'youtube' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
             >
               YouTube
+            </button>
+            <button
+              @click="contentFilter = 'smallGroupQuestions'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'smallGroupQuestions' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Small Group Questions
+            </button>
+            <button
+              @click="contentFilter = 'churchSocialPost'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'churchSocialPost' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Church Social Post
+            </button>
+            <button
+              @click="contentFilter = 'socialMediaCalendar'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'socialMediaCalendar' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Social Media Calendar
+            </button>
+            <button
+              @click="contentFilter = 'churchEmail'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'churchEmail' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Church Email
+            </button>
+            <button
+              @click="contentFilter = 'announcementScript'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'announcementScript' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Announcement Script
+            </button>
+            <button
+              @click="contentFilter = 'churchLetter'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'churchLetter' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Church Letter
             </button>
           </div>
 
