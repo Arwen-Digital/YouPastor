@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, nextTick } from 'vue'
 import { createPinia } from 'pinia'
 import { router } from './router'
 import App from './App.vue'
@@ -13,19 +13,12 @@ async function bootstrap() {
   const { useAuthStore } = await import('@/stores/auth')
   const auth = useAuthStore()
 
-  // If there's a stored token, restore auth state before routing
-  const storedToken = localStorage.getItem('__convexAuthJWT')
-  if (storedToken) {
-    const { setConvexAuthToken } = await import('@/lib/convex')
-    setConvexAuthToken(storedToken)
-  }
-
   await auth.fetchUser()
 
   app.use(router)
   app.mount('#app')
 
-  app.$nextTick(() => {
+  nextTick(() => {
     window.ipcRenderer?.on('main-process-message', (_event: any, message: any) => {
       console.log(message)
     })

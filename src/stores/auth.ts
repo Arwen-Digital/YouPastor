@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getConvexClient, setConvexAuthToken } from '@/lib/convex'
+import {
+  CONVEX_AUTH_TOKEN_KEY,
+  getConvexClient,
+  setConvexAuthChangeHandler,
+  setConvexAuthToken,
+} from '@/lib/convex'
 
 export interface AuthUser {
   _id: string
@@ -31,6 +36,27 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref<string | null>(null)
 
   const isReady = computed(() => !isCheckingAuth.value)
+  let handlingAuthExpiry = false
+
+  setConvexAuthChangeHandler((backendIsAuthenticated) => {
+    if (DEV_BYPASS || backendIsAuthenticated || handlingAuthExpiry) return
+
+    handlingAuthExpiry = true
+    console.warn('[auth] Session expired, redirecting to login')
+    setConvexAuthToken(null)
+    user.value = null
+    isAuthenticated.value = false
+
+    void import('@/router')
+      .then(({ router }) => {
+        if (router.currentRoute.value.name !== 'login') {
+          void router.push('/login')
+        }
+      })
+      .finally(() => {
+        handlingAuthExpiry = false
+      })
+  })
 
   function setDevUser(email?: string, name?: string) {
     user.value = {
@@ -51,7 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
 
-    const storedToken = localStorage.getItem('__convexAuthJWT')
+    const storedToken = localStorage.getItem(CONVEX_AUTH_TOKEN_KEY)
 
     // If no stored token, skip the Convex call entirely — we're definitely not authenticated
     if (!storedToken) {
@@ -112,11 +138,12 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('[auth] signIn result:', result)
 
       const token = result?.tokens?.token ?? null
-      if (!token) {
-        throw new Error('No auth token returned from server')
+      const refreshToken = result?.tokens?.refreshToken ?? null
+      if (!token || !refreshToken) {
+        throw new Error('No auth tokens returned from server')
       }
 
-      setConvexAuthToken(token)
+      setConvexAuthToken(token, refreshToken)
       await fetchUser()
       return isAuthenticated.value
     } catch (err: any) {
@@ -156,11 +183,12 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('[auth] signUp result:', result)
 
       const token = result?.tokens?.token ?? null
-      if (!token) {
-        throw new Error('No auth token returned from server')
+      const refreshToken = result?.tokens?.refreshToken ?? null
+      if (!token || !refreshToken) {
+        throw new Error('No auth tokens returned from server')
       }
 
-      setConvexAuthToken(token)
+      setConvexAuthToken(token, refreshToken)
       console.log('[auth] Token stored, waiting for auth handshake...')
       await new Promise((r) => setTimeout(r, 500))
 
