@@ -154,6 +154,19 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_sermon", ["sermonId"]),
 
+  // YouTube packages — saved from the Sermon to YouTube skill
+  youtubeDrafts: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    blogId: v.optional(v.id("blogPosts")),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_blog", ["blogId"]),
+
   agentWorkflows: defineTable({
     userId: v.id("users"),
     sermonId: v.optional(v.id("sermons")),

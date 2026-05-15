@@ -9,36 +9,22 @@ export const listMine = query({
     if (!userId) return []
 
     return await ctx.db
-      .query("blogPosts")
+      .query("youtubeDrafts")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .collect()
   },
 })
 
-export const listRecent = query({
-  args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (!userId) return []
-
-    return await ctx.db
-      .query("blogPosts")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(args.limit ?? 4)
-  },
-})
-
 export const getById = query({
-  args: { blogId: v.id("blogPosts") },
+  args: { youtubeId: v.id("youtubeDrafts") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
     if (!userId) return null
 
-    const blog = await ctx.db.get(args.blogId)
-    if (!blog || blog.userId !== userId) return null
+    const draft = await ctx.db.get(args.youtubeId)
+    if (!draft || draft.userId !== userId) return null
 
-    return blog
+    return draft
   },
 })

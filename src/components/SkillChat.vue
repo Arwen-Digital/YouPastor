@@ -12,12 +12,14 @@ import { useSaveBrainstorm } from '@/composables/useSaveBrainstorm'
 import { useSaveAgenda } from '@/composables/useSaveAgenda'
 import { useSaveDevotional } from '@/composables/useSaveDevotional'
 import { useSaveBlog } from '@/composables/useSaveBlog'
+import { useSaveYoutube } from '@/composables/useSaveYoutube'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
 import SaveAgendaModal from '@/components/SaveAgendaModal.vue'
 import SaveDevotionalModal from '@/components/SaveDevotionalModal.vue'
 import SaveBlogModal from '@/components/SaveBlogModal.vue'
+import SaveYoutubeModal from '@/components/SaveYoutubeModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -88,7 +90,8 @@ const isSermonBrainstorm = props.skillSlug === 'sermon-brainstorm'
 const isMeetingAgenda = props.skillSlug === 'meeting-agenda'
 const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
 const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog
+const isSermonToYoutube = props.skillSlug === 'sermon-to-youtube'
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube
 
 // Series save flow
 const {
@@ -156,6 +159,17 @@ const {
   reset: resetBlogSave,
 } = useSaveBlog()
 
+// YouTube save flow
+const {
+  status: youtubeSaveStatus,
+  preview: youtubePreview,
+  error: youtubeSaveError,
+  savedYoutubeId,
+  extract: extractYoutube,
+  save: confirmSaveYoutube,
+  reset: resetYoutubeSave,
+} = useSaveYoutube()
+
 const showSaveModal = ref(false)
 
 interface ChatMessage {
@@ -170,6 +184,8 @@ const userInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const selectedSermonContext = ref('')
 const selectedSermonId = ref<string | null>(null)
+const selectedBlogContext = ref('')
+const selectedBlogId = ref<string | null>(null)
 const hasStartedConversation = ref(false)
 
 // Load church profile from Convex
@@ -178,6 +194,12 @@ const { result: churchProfile } = useConvexQuery('profile/queries:getMine' as an
 // Recent saved sermons for sermon-to-blog intake
 const { result: recentSermons, isLoading: recentSermonsLoading } = useConvexQuery(
   'sermons/queries:listRecent' as any,
+  { limit: 4 }
+)
+
+// Recent blog posts for sermon-to-youtube intake
+const { result: recentBlogs, isLoading: recentBlogsLoading } = useConvexQuery(
+  'blogs/queries:listRecent' as any,
   { limit: 4 }
 )
 
@@ -245,14 +267,15 @@ const canSave = computed(() => {
     : isMeetingAgenda ? agendaSaveStatus.value
     : isMidweekDevotional ? devotionalSaveStatus.value
     : isSermonToBlog ? blogSaveStatus.value
+    : isSermonToYoutube ? youtubeSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
   // Series planner needs more back-and-forth (6 msgs)
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
-  // Blog should generally appear near/after body + SEO stages.
-  const threshold = isSeriesPlanner ? 6 : isSermonToBlog ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
+  // Blog/YouTube should generally appear near the end of staged output.
+  const threshold = isSeriesPlanner ? 6 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -289,11 +312,12 @@ function scrollToBottom() {
 watch(streamingContent, () => scrollToBottom())
 watch(isLoading, (loading) => { if (loading) scrollToBottom() })
 
-const showSermonChooser = computed(() => isSermonToBlog && !hasStartedConversation.value)
+const showSourceChooser = computed(() => (isSermonToBlog || isSermonToYoutube) && !hasStartedConversation.value)
 
 function getFullSystemPrompt(): string {
-  return selectedSermonContext.value
-    ? `${currentSystemPrompt.value}\n\n---\n\n${selectedSermonContext.value}`
+  const contextBlocks = [selectedSermonContext.value, selectedBlogContext.value].filter(Boolean)
+  return contextBlocks.length
+    ? `${currentSystemPrompt.value}\n\n---\n\n${contextBlocks.join('\n\n---\n\n')}`
     : currentSystemPrompt.value
 }
 
@@ -333,6 +357,25 @@ Sermon content:
 ${sermonContent}`
 }
 
+function buildBlogContext(blog: any): string {
+  const content = blog.content?.trim()
+  const maxContentChars = 20000
+  const blogContent = content
+    ? content.slice(0, maxContentChars) + (content.length > maxContentChars ? '\n\n[Content truncated for prompt length.]' : '')
+    : 'No blog content is saved for this blog post. Use the metadata below and ask the pastor for the core blog output if needed.'
+
+  return `## Selected Blog Post From Database
+
+The pastor selected this saved blog post for the Sermon to YouTube skill. Use it as the source material. Do NOT ask for sermon or blog source content again unless the saved content is missing. Move directly into YouTube optimization questions and staged output.
+
+Title: ${blog.title || 'Untitled blog post'}
+Status: ${blog.status || 'Not provided'}
+Created: ${formatDate(blog.createdAt)}
+
+Blog content:
+${blogContent}`
+}
+
 async function handleAssistantResponse(responseContent: string) {
   messages.value.push({ role: 'assistant', content: responseContent })
 
@@ -369,12 +412,18 @@ async function handleSermonSelect(sermon: any) {
   await startConversation(`I'd like to turn my saved sermon "${sermon.title || 'Untitled sermon'}" into a blog post.`)
 }
 
-async function handleStartWithoutSavedSermon() {
+async function handleBlogSelect(blog: any) {
+  selectedBlogId.value = blog._id
+  selectedBlogContext.value = buildBlogContext(blog)
+  await startConversation(`I'd like to turn my saved blog post "${blog.title || 'Untitled blog post'}" into a YouTube package.`)
+}
+
+async function handleStartWithoutSavedSource() {
   await startConversation(props.initialMessage)
 }
 
 onMounted(async () => {
-  if (isSermonToBlog) return
+  if (isSermonToBlog || isSermonToYoutube) return
   await startConversation(props.initialMessage)
 })
 
@@ -443,6 +492,7 @@ async function handleSaveClick() {
   if (isMeetingAgenda) resetAgendaSave()
   if (isMidweekDevotional) resetDevotionalSave()
   if (isSermonToBlog) resetBlogSave()
+  if (isSermonToYoutube) resetYoutubeSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -462,6 +512,8 @@ async function handleSaveClick() {
     await extractDevotional(extractionMessages as any)
   } else if (isSermonToBlog) {
     await extractBlog(extractionMessages as any, selectedSermonId.value)
+  } else if (isSermonToYoutube) {
+    await extractYoutube(extractionMessages as any, selectedBlogId.value)
   }
 }
 
@@ -487,6 +539,10 @@ function handleSaveConfirmDevotional(data: any) {
 
 function handleSaveConfirmBlog(data: any) {
   confirmSaveBlog(data)
+}
+
+function handleSaveConfirmYoutube(data: any) {
+  confirmSaveYoutube(data)
 }
 
 function handleSaveModalClose() {
@@ -515,6 +571,10 @@ function handleSaveModalClose() {
     const blogId = savedBlogId.value
     resetBlogSave()
     router.push(`/notebook/blog/${blogId}`)
+  } else if (isSermonToYoutube && youtubeSaveStatus.value === 'saved' && savedYoutubeId.value) {
+    const youtubeId = savedYoutubeId.value
+    resetYoutubeSave()
+    router.push(`/notebook/youtube/${youtubeId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -532,6 +592,9 @@ function handleSaveModalClose() {
     router.push('/notebook')
   } else if (blogSaveStatus.value === 'saved') {
     resetBlogSave()
+    router.push('/notebook')
+  } else if (youtubeSaveStatus.value === 'saved') {
+    resetYoutubeSave()
     router.push('/notebook')
   }
 }
@@ -569,55 +632,104 @@ function handleSaveModalClose() {
     </div>
 
     <div ref="messagesContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-      <div v-if="showSermonChooser" class="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
-        <div class="space-y-1">
-          <h3 class="text-sm font-semibold text-foreground">Choose a sermon to turn into a blog post</h3>
-          <p class="text-xs text-muted-foreground">Select one of your 4 most recent saved sermons, or start without a saved sermon.</p>
-        </div>
+      <div v-if="showSourceChooser" class="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+        <template v-if="isSermonToBlog">
+          <div class="space-y-1">
+            <h3 class="text-sm font-semibold text-foreground">Choose a sermon to turn into a blog post</h3>
+            <p class="text-xs text-muted-foreground">Select one of your 4 most recent saved sermons, or start without a saved sermon.</p>
+          </div>
 
-        <div v-if="recentSermonsLoading" class="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-3 text-sm text-muted-foreground">
-          <Loader2 class="h-4 w-4 animate-spin" />
-          Loading recent sermons...
-        </div>
+          <div v-if="recentSermonsLoading" class="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-3 text-sm text-muted-foreground">
+            <Loader2 class="h-4 w-4 animate-spin" />
+            Loading recent sermons...
+          </div>
 
-        <div v-else-if="recentSermons?.length" class="grid gap-2">
-          <button
-            v-for="sermon in recentSermons"
-            :key="sermon._id"
-            @click="handleSermonSelect(sermon)"
-            :disabled="isLoading"
-            class="group w-full rounded-xl border border-border bg-background p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 space-y-1">
-                <div class="text-sm font-medium text-foreground truncate">{{ sermon.title || 'Untitled sermon' }}</div>
-                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <span v-if="sermon.scriptureRef">{{ sermon.scriptureRef }}</span>
-                  <span v-if="sermon.scriptureRef">•</span>
-                  <span>{{ formatDate(sermon.createdAt) }}</span>
+          <div v-else-if="recentSermons?.length" class="grid gap-2">
+            <button
+              v-for="sermon in recentSermons"
+              :key="sermon._id"
+              @click="handleSermonSelect(sermon)"
+              :disabled="isLoading"
+              class="group w-full rounded-xl border border-border bg-background p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 space-y-1">
+                  <div class="text-sm font-medium text-foreground truncate">{{ sermon.title || 'Untitled sermon' }}</div>
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span v-if="sermon.scriptureRef">{{ sermon.scriptureRef }}</span>
+                    <span v-if="sermon.scriptureRef">•</span>
+                    <span>{{ formatDate(sermon.createdAt) }}</span>
+                  </div>
+                  <p v-if="sermon.content" class="text-xs text-muted-foreground line-clamp-2 pt-1">
+                    {{ stripHtml(sermon.content).slice(0, 180) }}{{ stripHtml(sermon.content).length > 180 ? '...' : '' }}
+                  </p>
                 </div>
-                <p v-if="sermon.content" class="text-xs text-muted-foreground line-clamp-2 pt-1">
-                  {{ stripHtml(sermon.content).slice(0, 180) }}{{ stripHtml(sermon.content).length > 180 ? '...' : '' }}
-                </p>
+                <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize group-hover:bg-primary/10 group-hover:text-primary">
+                  {{ sermon.status }}
+                </span>
               </div>
-              <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize group-hover:bg-primary/10 group-hover:text-primary">
-                {{ sermon.status }}
-              </span>
-            </div>
+            </button>
+          </div>
+
+          <div v-else class="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+            No saved sermons found yet. You can still paste sermon notes, an outline, or a transcript.
+          </div>
+
+          <button
+            @click="handleStartWithoutSavedSource"
+            :disabled="isLoading"
+            class="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            Start without a saved sermon
           </button>
-        </div>
+        </template>
 
-        <div v-else class="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-          No saved sermons found yet. You can still paste sermon notes, an outline, or a transcript.
-        </div>
+        <template v-else-if="isSermonToYoutube">
+          <div class="space-y-1">
+            <h3 class="text-sm font-semibold text-foreground">Choose a blog post to turn into a YouTube package</h3>
+            <p class="text-xs text-muted-foreground">Select one of your 4 most recent saved blog posts, or start without a saved blog post.</p>
+          </div>
 
-        <button
-          @click="handleStartWithoutSavedSermon"
-          :disabled="isLoading"
-          class="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
-        >
-          Start without a saved sermon
-        </button>
+          <div v-if="recentBlogsLoading" class="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-3 text-sm text-muted-foreground">
+            <Loader2 class="h-4 w-4 animate-spin" />
+            Loading recent blog posts...
+          </div>
+
+          <div v-else-if="recentBlogs?.length" class="grid gap-2">
+            <button
+              v-for="blog in recentBlogs"
+              :key="blog._id"
+              @click="handleBlogSelect(blog)"
+              :disabled="isLoading"
+              class="group w-full rounded-xl border border-border bg-background p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 space-y-1">
+                  <div class="text-sm font-medium text-foreground truncate">{{ blog.title || 'Untitled blog post' }}</div>
+                  <div class="text-xs text-muted-foreground">{{ formatDate(blog.createdAt) }}</div>
+                  <p v-if="blog.content" class="text-xs text-muted-foreground line-clamp-2 pt-1">
+                    {{ stripHtml(blog.content).slice(0, 180) }}{{ stripHtml(blog.content).length > 180 ? '...' : '' }}
+                  </p>
+                </div>
+                <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize group-hover:bg-primary/10 group-hover:text-primary">
+                  {{ blog.status }}
+                </span>
+              </div>
+            </button>
+          </div>
+
+          <div v-else class="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+            No saved blog posts found yet. You can still paste your current blog draft content.
+          </div>
+
+          <button
+            @click="handleStartWithoutSavedSource"
+            :disabled="isLoading"
+            class="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            Start without a saved blog post
+          </button>
+        </template>
       </div>
 
       <div
@@ -776,6 +888,18 @@ function handleSaveModalClose() {
       :is-saving="blogSaveStatus === 'saving'"
       :saved-id="savedBlogId"
       @save="handleSaveConfirmBlog"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveYoutubeModal
+      v-if="showSaveModal && isSermonToYoutube"
+      :save-status="youtubeSaveStatus"
+      :preview="youtubePreview"
+      :save-error="youtubeSaveError"
+      :is-saving="youtubeSaveStatus === 'saving'"
+      :saved-id="savedYoutubeId"
+      @save="handleSaveConfirmYoutube"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />
