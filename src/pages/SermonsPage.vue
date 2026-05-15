@@ -39,6 +39,10 @@ function formatDate(timestamp?: number): string {
     year: 'numeric',
   })
 }
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '').trim()
+}
 </script>
 
 <template>
@@ -170,7 +174,7 @@ function formatDate(timestamp?: number): string {
                       <span>{{ formatDate(sermon.createdAt) }}</span>
                     </div>
                     <p v-if="sermon.content" class="mt-1 text-xs text-muted-foreground line-clamp-2">
-                      {{ sermon.content.slice(0, 140) }}{{ sermon.content.length > 140 ? '...' : '' }}
+                      {{ stripHtml(sermon.content).slice(0, 140) }}{{ stripHtml(sermon.content).length > 140 ? '...' : '' }}
                     </p>
                   </div>
                   <ChevronRight class="mt-2 h-4 w-4 text-muted-foreground group-hover:text-amber-600" />
