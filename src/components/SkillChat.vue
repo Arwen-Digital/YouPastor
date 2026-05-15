@@ -11,11 +11,13 @@ import { useSaveResearch } from '@/composables/useSaveResearch'
 import { useSaveBrainstorm } from '@/composables/useSaveBrainstorm'
 import { useSaveAgenda } from '@/composables/useSaveAgenda'
 import { useSaveDevotional } from '@/composables/useSaveDevotional'
+import { useSaveBlog } from '@/composables/useSaveBlog'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
 import SaveAgendaModal from '@/components/SaveAgendaModal.vue'
 import SaveDevotionalModal from '@/components/SaveDevotionalModal.vue'
+import SaveBlogModal from '@/components/SaveBlogModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -86,7 +88,7 @@ const isSermonBrainstorm = props.skillSlug === 'sermon-brainstorm'
 const isMeetingAgenda = props.skillSlug === 'meeting-agenda'
 const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
 const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog
 
 // Series save flow
 const {
@@ -143,6 +145,17 @@ const {
   reset: resetDevotionalSave,
 } = useSaveDevotional()
 
+// Blog save flow
+const {
+  status: blogSaveStatus,
+  preview: blogPreview,
+  error: blogSaveError,
+  savedBlogId,
+  extract: extractBlog,
+  save: confirmSaveBlog,
+  reset: resetBlogSave,
+} = useSaveBlog()
+
 const showSaveModal = ref(false)
 
 interface ChatMessage {
@@ -156,6 +169,7 @@ const messages = ref<ChatMessage[]>([])
 const userInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const selectedSermonContext = ref('')
+const selectedSermonId = ref<string | null>(null)
 const hasStartedConversation = ref(false)
 
 // Load church profile from Convex
@@ -230,13 +244,15 @@ const canSave = computed(() => {
     : isSermonBrainstorm ? brainstormSaveStatus.value
     : isMeetingAgenda ? agendaSaveStatus.value
     : isMidweekDevotional ? devotionalSaveStatus.value
+    : isSermonToBlog ? blogSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
   // Series planner needs more back-and-forth (6 msgs)
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
-  const threshold = isSeriesPlanner ? 6 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
+  // Blog should generally appear near/after body + SEO stages.
+  const threshold = isSeriesPlanner ? 6 : isSermonToBlog ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -344,6 +360,7 @@ async function startConversation(userMessage: string) {
 }
 
 async function handleSermonSelect(sermon: any) {
+  selectedSermonId.value = sermon._id
   selectedSermonContext.value = buildSermonContext(sermon)
   await startConversation(`I'd like to turn my saved sermon "${sermon.title || 'Untitled sermon'}" into a blog post.`)
 }
@@ -421,6 +438,7 @@ async function handleSaveClick() {
   if (isSermonBrainstorm) resetBrainstormSave()
   if (isMeetingAgenda) resetAgendaSave()
   if (isMidweekDevotional) resetDevotionalSave()
+  if (isSermonToBlog) resetBlogSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -438,6 +456,8 @@ async function handleSaveClick() {
     await extractAgenda(extractionMessages as any)
   } else if (isMidweekDevotional) {
     await extractDevotional(extractionMessages as any)
+  } else if (isSermonToBlog) {
+    await extractBlog(extractionMessages as any, selectedSermonId.value)
   }
 }
 
@@ -459,6 +479,10 @@ function handleSaveConfirmAgenda(data: any) {
 
 function handleSaveConfirmDevotional(data: any) {
   confirmSaveDevotional(data)
+}
+
+function handleSaveConfirmBlog(data: any) {
+  confirmSaveBlog(data)
 }
 
 function handleSaveModalClose() {
@@ -483,6 +507,10 @@ function handleSaveModalClose() {
     const devotionalId = savedDevotionalId.value
     resetDevotionalSave()
     router.push(`/notebook/devotional/${devotionalId}`)
+  } else if (isSermonToBlog && blogSaveStatus.value === 'saved' && savedBlogId.value) {
+    const blogId = savedBlogId.value
+    resetBlogSave()
+    router.push(`/notebook/blog/${blogId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -497,6 +525,9 @@ function handleSaveModalClose() {
     router.push('/notebook')
   } else if (devotionalSaveStatus.value === 'saved') {
     resetDevotionalSave()
+    router.push('/notebook')
+  } else if (blogSaveStatus.value === 'saved') {
+    resetBlogSave()
     router.push('/notebook')
   }
 }
@@ -729,6 +760,18 @@ function handleSaveModalClose() {
       :is-saving="devotionalSaveStatus === 'saving'"
       :saved-id="savedDevotionalId"
       @save="handleSaveConfirmDevotional"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveBlogModal
+      v-if="showSaveModal && isSermonToBlog"
+      :save-status="blogSaveStatus"
+      :preview="blogPreview"
+      :save-error="blogSaveError"
+      :is-saving="blogSaveStatus === 'saving'"
+      :saved-id="savedBlogId"
+      @save="handleSaveConfirmBlog"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />

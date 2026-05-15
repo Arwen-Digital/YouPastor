@@ -10,13 +10,14 @@ marked.setOptions({ breaks: true, gfm: true })
 const router = useRouter()
 const route = useRoute()
 
-// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional'
+// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional', 'blog'
 const view = computed(() => {
-  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId) return 'list'
+  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId && !route.params.blogId) return 'list'
   if (route.params.researchId) return 'research'
   if (route.params.brainstormId) return 'brainstorm'
   if (route.params.agendaId) return 'agenda'
   if (route.params.devotionalId) return 'devotional'
+  if (route.params.blogId) return 'blog'
   if (route.params.id) return 'series'
   return 'list'
 })
@@ -26,6 +27,7 @@ const selectedResearchId = computed(() => route.params.researchId as string | un
 const selectedBrainstormId = computed(() => route.params.brainstormId as string | undefined)
 const selectedAgendaId = computed(() => route.params.agendaId as string | undefined)
 const selectedDevotionalId = computed(() => route.params.devotionalId as string | undefined)
+const selectedBlogId = computed(() => route.params.blogId as string | undefined)
 
 // ── Series list ──
 const seriesList = ref<any[]>([])
@@ -52,6 +54,10 @@ let agendaListUnsub: (() => void) | null = null
 const devotionalList = ref<any[]>([])
 let devotionalListUnsub: (() => void) | null = null
 
+// ── Blog posts list ──
+const blogList = ref<any[]>([])
+let blogListUnsub: (() => void) | null = null
+
 // ── Series detail ──
 const seriesDetail = ref<any>(null)
 const detailLoading = ref(false)
@@ -76,6 +82,11 @@ let agendaDetailUnsub: (() => void) | null = null
 const devotionalDetail = ref<any>(null)
 const devotionalDetailLoading = ref(false)
 let devotionalDetailUnsub: (() => void) | null = null
+
+// ── Blog detail ──
+const blogDetail = ref<any>(null)
+const blogDetailLoading = ref(false)
+let blogDetailUnsub: (() => void) | null = null
 
 // ── Series-linked items ──
 const seriesResearchNotes = ref<any[]>([])
@@ -121,6 +132,9 @@ onMounted(async () => {
     devotionalListUnsub = client.onUpdate('devotionals/queries:listMine' as any, {}, (data: any) => {
       devotionalList.value = data ?? []
     })
+    blogListUnsub = client.onUpdate('blogs/queries:listMine' as any, {}, (data: any) => {
+      blogList.value = data ?? []
+    })
   } catch (err) {
     console.error('Failed to load notebook:', err)
     listLoading.value = false
@@ -134,11 +148,13 @@ onUnmounted(() => {
   sermonListUnsub?.()
   agendaListUnsub?.()
   devotionalListUnsub?.()
+  blogListUnsub?.()
   detailUnsub?.()
   researchDetailUnsub?.()
   brainstormDetailUnsub?.()
   agendaDetailUnsub?.()
   devotionalDetailUnsub?.()
+  blogDetailUnsub?.()
   seriesResearchUnsub?.()
   seriesBrainstormUnsub?.()
   seriesSermonsUnsub?.()
@@ -252,7 +268,25 @@ watch(selectedDevotionalId, async (newId) => {
   }
 }, { immediate: true })
 
-async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional', id: string) {
+// Watch blog ID
+watch(selectedBlogId, async (newId) => {
+  if (blogDetailUnsub) { blogDetailUnsub(); blogDetailUnsub = null }
+  blogDetail.value = null
+  if (!newId) return
+  blogDetailLoading.value = true
+  try {
+    const client = getConvexClient()
+    blogDetailUnsub = client.onUpdate('blogs/queries:getById' as any, { blogId: newId }, (data: any) => {
+      blogDetail.value = data
+      blogDetailLoading.value = false
+    })
+  } catch (err) {
+    console.error('Failed to load blog post:', err)
+    blogDetailLoading.value = false
+  }
+}, { immediate: true })
+
+async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog', id: string) {
   if (!confirm('Delete this item? This cannot be undone.')) return
   deletingId.value = id
   try {
@@ -269,6 +303,9 @@ async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda
     } else if (type === 'devotional') {
       await client.mutation('devotionals/mutations:remove' as any, { devotionalId: id })
       if (selectedDevotionalId.value === id) router.push('/notebook')
+    } else if (type === 'blog') {
+      await client.mutation('blogs/mutations:remove' as any, { blogId: id })
+      if (selectedBlogId.value === id) router.push('/notebook')
     } else {
       await client.mutation('research/mutations:remove' as any, { noteId: id })
       if (selectedResearchId.value === id) router.push('/notebook')
@@ -329,6 +366,7 @@ function getTypeBadge(type: string): { label: string; color: string } {
     case 'brainstorm': return { label: 'Brainstorm', color: 'bg-amber-500/10 text-amber-600' }
     case 'agenda': return { label: 'Agenda', color: 'bg-emerald-500/10 text-emerald-600' }
     case 'devotional': return { label: 'Devotional', color: 'bg-violet-500/10 text-violet-600' }
+    case 'blog': return { label: 'Blog', color: 'bg-orange-500/10 text-orange-600' }
     default: return { label: type, color: 'bg-muted text-muted-foreground' }
   }
 }
@@ -342,7 +380,7 @@ function getSeriesName(seriesId: string | undefined): string {
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
-    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional'
+    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog'
     id: string
     title: string
     subtitle: string
@@ -356,6 +394,7 @@ const combinedList = computed(() => {
     ...brainstormList.value.map(b => ({ type: 'brainstorm' as const, id: b._id, title: b.passage, subtitle: b.bigIdea || '', date: b.createdAt || 0, status: b.status || 'draft', tab: 'prep' as const })),
     ...agendaList.value.map(a => ({ type: 'agenda' as const, id: a._id, title: a.meetingType, subtitle: '', date: a.createdAt || 0, status: a.status || 'draft', tab: 'pastoral' as const })),
     ...devotionalList.value.map(d => ({ type: 'devotional' as const, id: d._id, title: d.scriptureRef, subtitle: '', date: d.createdAt || 0, status: d.status || 'draft', tab: 'pastoral' as const })),
+    ...blogList.value.map(b => ({ type: 'blog' as const, id: b._id, title: b.title, subtitle: '', date: b.createdAt || 0, status: b.status || 'draft', tab: 'content' as const })),
   ]
   return items.sort((a, b) => b.date - a.date)
 })
@@ -399,6 +438,7 @@ const filteredList = computed(() => {
             <template v-else-if="view === 'brainstorm'">Brainstorm brief</template>
             <template v-else-if="view === 'agenda'">Meeting agenda</template>
             <template v-else-if="view === 'devotional'">Midweek devotional</template>
+            <template v-else-if="view === 'blog'">Blog post</template>
             <template v-else>Your saved work, organized by purpose</template>
           </p>
         </div>
@@ -533,7 +573,8 @@ const filteredList = computed(() => {
               : item.type === 'research' ? `/notebook/research/${item.id}`
               : item.type === 'brainstorm' ? `/notebook/brainstorm/${item.id}`
               : item.type === 'agenda' ? `/notebook/agenda/${item.id}`
-              : `/notebook/devotional/${item.id}`
+              : item.type === 'devotional' ? `/notebook/devotional/${item.id}`
+              : `/notebook/blog/${item.id}`
             )"
             class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
@@ -543,6 +584,7 @@ const filteredList = computed(() => {
                 <Search v-else-if="item.type === 'research'" class="h-5 w-5" />
                 <CalendarDays v-else-if="item.type === 'agenda'" class="h-5 w-5" />
                 <Heart v-else-if="item.type === 'devotional'" class="h-5 w-5" />
+                <svg v-else-if="item.type === 'blog'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
@@ -908,6 +950,54 @@ const filteredList = computed(() => {
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">Agenda not found</h3>
             <p class="text-sm text-muted-foreground">This agenda may have been deleted.</p>
+          </div>
+          <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blog Detail View -->
+    <div v-else-if="view === 'blog'" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+        <div v-if="blogDetailLoading" class="flex items-center justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
+        <div v-else-if="blogDetail" class="space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ blogDetail.title }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">Blog</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="handleDelete('blog', blogDetail._id)"
+                :disabled="deletingId === blogDetail._id"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div v-if="blogDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground">
+            <div v-html="marked.parse(blogDetail.content)" />
+          </div>
+
+          <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
+            <span v-if="blogDetail.createdAt">Created {{ formatDate(blogDetail.createdAt) }}</span>
+            <span v-if="blogDetail.updatedAt && blogDetail.updatedAt !== blogDetail.createdAt">Updated {{ formatDate(blogDetail.updatedAt) }}</span>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col items-center justify-center py-20 space-y-4">
+          <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center"><BookOpen class="h-8 w-8 text-muted-foreground" /></div>
+          <div class="text-center space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">Blog post not found</h3>
+            <p class="text-sm text-muted-foreground">This blog post may have been deleted.</p>
           </div>
           <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
         </div>
