@@ -4,7 +4,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   Home,
-  Search,
   Notebook,
   BookOpen,
   Lightbulb,
@@ -61,7 +60,7 @@ interface NavItem {
 const topNav: NavItem[] = [
   { label: 'Home', icon: Home, path: '/' },
   { label: 'Notebook', icon: Notebook, path: '/notebook' },
-  { label: 'Search', icon: Search, path: '/search' },
+  { label: 'Sermons', icon: BookOpen, path: '/sermons' },
 ]
 
 const workspaceSections: NavItem[] = [

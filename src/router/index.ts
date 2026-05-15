@@ -70,6 +70,16 @@ const routes = [
         component: () => import('@/pages/SeriesPage.vue'),
       },
       {
+        path: 'sermons',
+        name: 'sermons',
+        component: () => import('@/pages/SermonsPage.vue'),
+      },
+      {
+        path: 'sermons/:action/:mode/:seriesId?',
+        name: 'sermon-flow',
+        component: () => import('@/pages/SermonFlowPage.vue'),
+      },
+      {
         path: 'search',
         name: 'search',
         component: () => import('@/pages/SearchPage.vue'),
