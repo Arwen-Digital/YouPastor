@@ -116,6 +116,11 @@ const prepFilter = ref<'all' | 'sermon' | 'series' | 'research' | 'brainstorm'>(
     ? route.query.filter
     : 'all'
 )
+const contentFilter = ref<'all' | 'blog' | 'youtube'>(
+  route.query.filter === 'blog' || route.query.filter === 'youtube'
+    ? route.query.filter
+    : 'all'
+)
 const pastoralFilter = ref<'all' | 'devotional' | 'agenda'>('all')
 
 // ── Deleting ──
@@ -446,7 +451,13 @@ const filteredList = computed(() => {
     }
     return items
   }
-  if (activeTab.value === 'content') return combinedList.value.filter(i => i.tab === 'content')
+  if (activeTab.value === 'content') {
+    let items = combinedList.value.filter(i => i.tab === 'content')
+    if (contentFilter.value !== 'all') {
+      items = items.filter(i => i.type === contentFilter.value)
+    }
+    return items
+  }
   
   // Pastoral tab
   let pastoralItems = combinedList.value.filter(i => i.tab === 'pastoral')
@@ -542,6 +553,28 @@ const filteredList = computed(() => {
               :class="['text-xs font-medium transition-colors hover:text-foreground', prepFilter === 'brainstorm' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
             >
               Brainstorm
+            </button>
+          </div>
+
+          <!-- Sub-filters for Content -->
+          <div v-if="activeTab === 'content'" class="flex items-center gap-4 px-2">
+            <button
+              @click="contentFilter = 'all'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'all' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              All
+            </button>
+            <button
+              @click="contentFilter = 'blog'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'blog' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              Blog
+            </button>
+            <button
+              @click="contentFilter = 'youtube'"
+              :class="['text-xs font-medium transition-colors hover:text-foreground', contentFilter === 'youtube' ? 'text-foreground underline underline-offset-4' : 'text-muted-foreground']"
+            >
+              YouTube
             </button>
           </div>
 
