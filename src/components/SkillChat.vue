@@ -85,6 +85,7 @@ const isSermonResearch = props.skillSlug === 'sermon-research'
 const isSermonBrainstorm = props.skillSlug === 'sermon-brainstorm'
 const isMeetingAgenda = props.skillSlug === 'meeting-agenda'
 const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
+const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
 const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional
 
 // Series save flow
@@ -154,9 +155,17 @@ marked.setOptions({ breaks: true, gfm: true })
 const messages = ref<ChatMessage[]>([])
 const userInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const selectedSermonContext = ref('')
+const hasStartedConversation = ref(false)
 
 // Load church profile from Convex
 const { result: churchProfile } = useConvexQuery('profile/queries:getMine' as any)
+
+// Recent saved sermons for sermon-to-blog intake
+const { result: recentSermons, isLoading: recentSermonsLoading } = useConvexQuery(
+  'sermons/queries:listRecent' as any,
+  { limit: 4 }
+)
 
 // Derive church context from profile
 const churchContext = computed<ChurchContext>(() => ({
@@ -260,30 +269,92 @@ function scrollToBottom() {
 watch(streamingContent, () => scrollToBottom())
 watch(isLoading, (loading) => { if (loading) scrollToBottom() })
 
-onMounted(async () => {
-  messages.value.push({ role: 'user', content: props.initialMessage })
+const showSermonChooser = computed(() => isSermonToBlog && !hasStartedConversation.value)
+
+function getFullSystemPrompt(): string {
+  return selectedSermonContext.value
+    ? `${currentSystemPrompt.value}\n\n---\n\n${selectedSermonContext.value}`
+    : currentSystemPrompt.value
+}
+
+function buildChatHistory(): ChatMessage[] {
+  return [
+    { role: 'system', content: getFullSystemPrompt() },
+    ...messages.value,
+  ]
+}
+
+function formatDate(timestamp?: number): string {
+  if (!timestamp) return 'Unknown date'
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function buildSermonContext(sermon: any): string {
+  const content = sermon.content?.trim()
+  const maxContentChars = 20000
+  const sermonContent = content
+    ? content.slice(0, maxContentChars) + (content.length > maxContentChars ? '\n\n[Content truncated for prompt length.]' : '')
+    : 'No sermon content is saved for this sermon. Use the metadata below and ask the pastor for the outline, transcript, or notes.'
+
+  return `## Selected Sermon From Database
+
+The pastor selected this saved sermon for the Sermon to Blog skill. Use it as the sermon source material. Do NOT ask what they preached on Sunday unless the saved content is missing. Move to the next most useful blog-building question, such as the one sentence they want readers to remember, the strongest illustration, the concrete application, or the SEO/search angle.
+
+Title: ${sermon.title || 'Untitled sermon'}
+Scripture: ${sermon.scriptureRef || 'Not provided'}
+Status: ${sermon.status || 'Not provided'}
+Created: ${formatDate(sermon.createdAt)}
+
+Sermon content:
+${sermonContent}`
+}
+
+async function handleAssistantResponse(responseContent: string) {
+  messages.value.push({ role: 'assistant', content: responseContent })
+
+  // Detect intake handoff and automatically switch to researcher
+  if (isSermonResearch && role.value === 'orchestrator' && responseContent.includes('RESEARCH_READY:')) {
+    await handoffToResearcher()
+  }
+
+  // Detect brainstorm handoff and generate the brief
+  if (isSermonBrainstorm && role.value === 'orchestrator' && responseContent.includes('BRIEF_READY:')) {
+    await handoffToBriefGenerator()
+  }
+}
+
+async function startConversation(userMessage: string) {
+  if (hasStartedConversation.value || isLoading.value) return
+
+  hasStartedConversation.value = true
+  messages.value.push({ role: 'user', content: userMessage })
   scrollToBottom()
 
-  const result = await sendMessage([
-    { role: 'system', content: currentSystemPrompt.value },
-    { role: 'user', content: props.initialMessage },
-  ])
+  const result = await sendMessage(buildChatHistory() as any)
 
   if (result) {
-    messages.value.push({ role: 'assistant', content: result.content })
-
-    // Detect intake handoff and automatically switch to researcher
-    if (isSermonResearch && role.value === 'orchestrator' && result.content.includes('RESEARCH_READY:')) {
-      await handoffToResearcher()
-    }
-
-    // Detect brainstorm handoff and generate the brief
-    if (isSermonBrainstorm && role.value === 'orchestrator' && result.content.includes('BRIEF_READY:')) {
-      await handoffToBriefGenerator()
-    }
+    await handleAssistantResponse(result.content)
   }
 
   scrollToBottom()
+}
+
+async function handleSermonSelect(sermon: any) {
+  selectedSermonContext.value = buildSermonContext(sermon)
+  await startConversation(`I'd like to turn my saved sermon "${sermon.title || 'Untitled sermon'}" into a blog post.`)
+}
+
+async function handleStartWithoutSavedSermon() {
+  await startConversation(props.initialMessage)
+}
+
+onMounted(async () => {
+  if (isSermonToBlog) return
+  await startConversation(props.initialMessage)
 })
 
 /** Switch from orchestrator intake to researcher model and trigger research generation */
@@ -296,12 +367,7 @@ async function handoffToResearcher() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  const chatHistory: ChatMessage[] = [
-    { role: 'system', content: currentSystemPrompt.value },
-    ...messages.value,
-  ]
-
-  await streamMessage(chatHistory as any)
+  await streamMessage(buildChatHistory() as any)
 
   if (streamingContent.value) {
     messages.value.push({ role: 'assistant', content: streamingContent.value })
@@ -321,12 +387,7 @@ async function handoffToBriefGenerator() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  const chatHistory: ChatMessage[] = [
-    { role: 'system', content: currentSystemPrompt.value },
-    ...messages.value,
-  ]
-
-  await streamMessage(chatHistory as any)
+  await streamMessage(buildChatHistory() as any)
 
   if (streamingContent.value) {
     messages.value.push({ role: 'assistant', content: streamingContent.value })
@@ -340,29 +401,14 @@ async function handleSend() {
   if (!text || isLoading.value) return
 
   userInput.value = ''
+  hasStartedConversation.value = true
   messages.value.push({ role: 'user', content: text })
   scrollToBottom()
 
-  const chatHistory: ChatMessage[] = [
-    { role: 'system', content: currentSystemPrompt.value },
-    ...messages.value,
-  ]
-
-  await streamMessage(chatHistory as any)
+  await streamMessage(buildChatHistory() as any)
 
   if (streamingContent.value) {
-    const responseContent = streamingContent.value
-    messages.value.push({ role: 'assistant', content: responseContent })
-
-    // Detect intake handoff and automatically switch to researcher
-    if (isSermonResearch && role.value === 'orchestrator' && responseContent.includes('RESEARCH_READY:')) {
-      await handoffToResearcher()
-    }
-
-    // Detect brainstorm intake handoff and generate the brief
-    if (isSermonBrainstorm && role.value === 'orchestrator' && responseContent.includes('BRIEF_READY:')) {
-      await handoffToBriefGenerator()
-    }
+    await handleAssistantResponse(streamingContent.value)
   }
 }
 
@@ -488,6 +534,57 @@ function handleSaveModalClose() {
     </div>
 
     <div ref="messagesContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div v-if="showSermonChooser" class="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+        <div class="space-y-1">
+          <h3 class="text-sm font-semibold text-foreground">Choose a sermon to turn into a blog post</h3>
+          <p class="text-xs text-muted-foreground">Select one of your 4 most recent saved sermons, or start without a saved sermon.</p>
+        </div>
+
+        <div v-if="recentSermonsLoading" class="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-3 text-sm text-muted-foreground">
+          <Loader2 class="h-4 w-4 animate-spin" />
+          Loading recent sermons...
+        </div>
+
+        <div v-else-if="recentSermons?.length" class="grid gap-2">
+          <button
+            v-for="sermon in recentSermons"
+            :key="sermon._id"
+            @click="handleSermonSelect(sermon)"
+            :disabled="isLoading"
+            class="group w-full rounded-xl border border-border bg-background p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 space-y-1">
+                <div class="text-sm font-medium text-foreground truncate">{{ sermon.title || 'Untitled sermon' }}</div>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  <span v-if="sermon.scriptureRef">{{ sermon.scriptureRef }}</span>
+                  <span v-if="sermon.scriptureRef">•</span>
+                  <span>{{ formatDate(sermon.createdAt) }}</span>
+                </div>
+                <p v-if="sermon.content" class="text-xs text-muted-foreground line-clamp-2 pt-1">
+                  {{ sermon.content.slice(0, 180) }}{{ sermon.content.length > 180 ? '...' : '' }}
+                </p>
+              </div>
+              <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize group-hover:bg-primary/10 group-hover:text-primary">
+                {{ sermon.status }}
+              </span>
+            </div>
+          </button>
+        </div>
+
+        <div v-else class="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+          No saved sermons found yet. You can still paste sermon notes, an outline, or a transcript.
+        </div>
+
+        <button
+          @click="handleStartWithoutSavedSermon"
+          :disabled="isLoading"
+          class="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+        >
+          Start without a saved sermon
+        </button>
+      </div>
+
       <div
         v-for="(msg, i) in messages"
         :key="i"
