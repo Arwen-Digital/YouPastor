@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
+import Highlight from '@tiptap/extension-highlight'
 import { marked } from 'marked'
 import {
   ArrowLeft,
@@ -61,7 +62,7 @@ const { mutate: updateSermon, isLoading: updateSaving } = useConvexMutation('ser
 const isSaving = computed(() => createSaving.value || updateSaving.value)
 
 const editor = useEditor({
-  extensions: [StarterKit],
+  extensions: [StarterKit, Highlight.configure({ multicolor: true })],
   content: '',
   editorProps: {
     attributes: {
@@ -167,6 +168,14 @@ function formatDate(timestamp?: number): string {
 
 function setHeading(level: 1 | 2 | 3) {
   editor.value?.chain().focus().toggleHeading({ level }).run()
+}
+
+function toggleHighlight() {
+  editor.value?.chain().focus().toggleHighlight({ color: '#fef08a' }).run()
+}
+
+function clearHighlight() {
+  editor.value?.chain().focus().unsetHighlight().run()
 }
 
 function clearSelectedResource() {
@@ -302,6 +311,8 @@ async function handleSave() {
               <div class="mx-1 h-5 w-px bg-border" />
               <button @click="editor?.chain().focus().toggleBold().run()" :class="['toolbar-btn', editor?.isActive('bold') ? 'toolbar-active' : '']"><strong>B</strong></button>
               <button @click="editor?.chain().focus().toggleItalic().run()" :class="['toolbar-btn', editor?.isActive('italic') ? 'toolbar-active' : '']"><Italic class="h-4 w-4" /></button>
+              <button @click="toggleHighlight" :class="['toolbar-btn', editor?.isActive('highlight') ? 'toolbar-active' : '']"><span class="h-3.5 w-3.5 rounded-sm bg-yellow-200 border border-yellow-300" /> Highlight</button>
+              <button @click="clearHighlight" class="toolbar-btn">Clear highlight</button>
               <div class="mx-1 h-5 w-px bg-border" />
               <button @click="editor?.chain().focus().toggleBulletList().run()" :class="['toolbar-btn', editor?.isActive('bulletList') ? 'toolbar-active' : '']"><List class="h-4 w-4" /></button>
               <button @click="editor?.chain().focus().toggleOrderedList().run()" :class="['toolbar-btn', editor?.isActive('orderedList') ? 'toolbar-active' : '']"><ListOrdered class="h-4 w-4" /></button>
