@@ -60,6 +60,11 @@ const routes = [
         component: () => import('@/pages/NotebookPage.vue'),
       },
       {
+        path: 'notebook/small-group/:smallGroupId',
+        name: 'notebook-small-group-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
         path: 'notebook/:id',
         name: 'notebook-detail',
         component: () => import('@/pages/NotebookPage.vue'),

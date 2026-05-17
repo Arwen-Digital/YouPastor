@@ -13,6 +13,7 @@ import { useSaveAgenda } from '@/composables/useSaveAgenda'
 import { useSaveDevotional } from '@/composables/useSaveDevotional'
 import { useSaveBlog } from '@/composables/useSaveBlog'
 import { useSaveYoutube } from '@/composables/useSaveYoutube'
+import { useSaveSmallGroup } from '@/composables/useSaveSmallGroup'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
@@ -20,6 +21,7 @@ import SaveAgendaModal from '@/components/SaveAgendaModal.vue'
 import SaveDevotionalModal from '@/components/SaveDevotionalModal.vue'
 import SaveBlogModal from '@/components/SaveBlogModal.vue'
 import SaveYoutubeModal from '@/components/SaveYoutubeModal.vue'
+import SaveSmallGroupModal from '@/components/SaveSmallGroupModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -117,8 +119,9 @@ const isMeetingAgenda = props.skillSlug === 'meeting-agenda'
 const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
 const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
 const isSermonToYoutube = props.skillSlug === 'sermon-to-youtube'
+const isSmallGroupQuestions = props.skillSlug === 'small-group-questions'
 const isIntakePhase = ref(true)
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions
 
 // Series save flow
 const {
@@ -196,6 +199,17 @@ const {
   save: confirmSaveYoutube,
   reset: resetYoutubeSave,
 } = useSaveYoutube()
+
+// Small group save flow
+const {
+  status: smallGroupSaveStatus,
+  preview: smallGroupPreview,
+  error: smallGroupSaveError,
+  savedGuideId,
+  extract: extractSmallGroup,
+  save: confirmSaveSmallGroup,
+  reset: resetSmallGroupSave,
+} = useSaveSmallGroup()
 
 const showSaveModal = ref(false)
 
@@ -288,8 +302,13 @@ const currentSystemPrompt = ref(
   isSermonResearch ? intakePrompt.value
   : isSermonBrainstorm ? brainstormIntakePrompt.value
   : isSermonToYoutube ? youtubeIntakePrompt.value
+  : isSmallGroupQuestions ? baseSystemPrompt.value
   : genericIntakePrompt.value
 )
+
+if (isSmallGroupQuestions) {
+  isIntakePhase.value = false
+}
 
 // Update system prompt when church profile loads or changes
 watch(baseSystemPrompt, (newPrompt) => {
@@ -336,6 +355,7 @@ const canSave = computed(() => {
     : isMidweekDevotional ? devotionalSaveStatus.value
     : isSermonToBlog ? blogSaveStatus.value
     : isSermonToYoutube ? youtubeSaveStatus.value
+    : isSmallGroupQuestions ? smallGroupSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
@@ -343,7 +363,7 @@ const canSave = computed(() => {
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
   // Blog/YouTube should generally appear near the end of staged output.
-  const threshold = isSeriesPlanner ? 6 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
+  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -380,7 +400,7 @@ function scrollToBottom() {
 watch(streamingContent, () => scrollToBottom())
 watch(isLoading, (loading) => { if (loading) scrollToBottom() })
 
-const showSourceChooser = computed(() => (isSermonToBlog || isSermonToYoutube) && !hasStartedConversation.value)
+const showSourceChooser = computed(() => (isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions) && !hasStartedConversation.value)
 
 function getFullSystemPrompt(): string {
   const contextBlocks = [selectedSermonContext.value, selectedBlogContext.value].filter(Boolean)
@@ -412,9 +432,13 @@ function buildSermonContext(sermon: any): string {
     ? content.slice(0, maxContentChars) + (content.length > maxContentChars ? '\n\n[Content truncated for prompt length.]' : '')
     : 'No sermon content is saved for this sermon. Use the metadata below and ask the pastor for the outline, transcript, or notes.'
 
+  const usageInstruction = isSmallGroupQuestions
+    ? 'The pastor selected this saved sermon for the Small Group Questions skill. Use it as the source material and move directly into building discussion-ready prompts. Do NOT ask what they preached on Sunday unless the saved content is missing.'
+    : 'The pastor selected this saved sermon for the Sermon to Blog skill. Use it as the sermon source material. Do NOT ask what they preached on Sunday unless the saved content is missing. Move to the next most useful blog-building question, such as the one sentence they want readers to remember, the strongest illustration, the concrete application, or the SEO/search angle.'
+
   return `## Selected Sermon From Database
 
-The pastor selected this saved sermon for the Sermon to Blog skill. Use it as the sermon source material. Do NOT ask what they preached on Sunday unless the saved content is missing. Move to the next most useful blog-building question, such as the one sentence they want readers to remember, the strongest illustration, the concrete application, or the SEO/search angle.
+${usageInstruction}
 
 Title: ${sermon.title || 'Untitled sermon'}
 Scripture: ${sermon.scriptureRef || 'Not provided'}
@@ -463,7 +487,7 @@ async function handleAssistantResponse(responseContent: string) {
   }
 
   // Generic intake handoff: final generation uses generator for all remaining skills.
-  if (!isSermonResearch && !isSermonBrainstorm && !isSermonToYoutube && isIntakePhase.value && responseContent.includes('SKILL_READY:')) {
+  if (!isSermonResearch && !isSermonBrainstorm && !isSermonToYoutube && !isSmallGroupQuestions && isIntakePhase.value && responseContent.includes('SKILL_READY:')) {
     await handoffToGenerator()
   }
 }
@@ -487,6 +511,10 @@ async function startConversation(userMessage: string) {
 async function handleSermonSelect(sermon: any) {
   selectedSermonId.value = sermon._id
   selectedSermonContext.value = buildSermonContext(sermon)
+  if (isSmallGroupQuestions) {
+    await startConversation(`I'd like to create small group questions from my saved sermon "${sermon.title || 'Untitled sermon'}".`)
+    return
+  }
   await startConversation(`I'd like to turn my saved sermon "${sermon.title || 'Untitled sermon'}" into a blog post.`)
 }
 
@@ -501,7 +529,7 @@ async function handleStartWithoutSavedSource() {
 }
 
 onMounted(async () => {
-  if (isSermonToBlog || isSermonToYoutube) return
+  if (isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions) return
   await startConversation(props.initialMessage)
 })
 
@@ -610,6 +638,7 @@ async function handleSaveClick() {
   if (isMidweekDevotional) resetDevotionalSave()
   if (isSermonToBlog) resetBlogSave()
   if (isSermonToYoutube) resetYoutubeSave()
+  if (isSmallGroupQuestions) resetSmallGroupSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -631,6 +660,8 @@ async function handleSaveClick() {
     await extractBlog(extractionMessages as any, selectedSermonId.value)
   } else if (isSermonToYoutube) {
     await extractYoutube(extractionMessages as any, selectedBlogId.value)
+  } else if (isSmallGroupQuestions) {
+    await extractSmallGroup(extractionMessages as any, selectedSermonId.value)
   }
 }
 
@@ -660,6 +691,10 @@ function handleSaveConfirmBlog(data: any) {
 
 function handleSaveConfirmYoutube(data: any) {
   confirmSaveYoutube(data)
+}
+
+function handleSaveConfirmSmallGroup(data: any) {
+  confirmSaveSmallGroup(data)
 }
 
 function handleSaveModalClose() {
@@ -692,6 +727,9 @@ function handleSaveModalClose() {
     const youtubeId = savedYoutubeId.value
     resetYoutubeSave()
     router.push(`/notebook/youtube/${youtubeId}`)
+  } else if (isSmallGroupQuestions && smallGroupSaveStatus.value === 'saved' && savedGuideId.value) {
+    resetSmallGroupSave()
+    router.push('/notebook?tab=content&filter=smallGroupQuestions')
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -713,6 +751,9 @@ function handleSaveModalClose() {
   } else if (youtubeSaveStatus.value === 'saved') {
     resetYoutubeSave()
     router.push('/notebook')
+  } else if (smallGroupSaveStatus.value === 'saved') {
+    resetSmallGroupSave()
+    router.push('/notebook?tab=content&filter=smallGroupQuestions')
   }
 }
 </script>
@@ -750,9 +791,9 @@ function handleSaveModalClose() {
 
     <div ref="messagesContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
       <div v-if="showSourceChooser" class="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
-        <template v-if="isSermonToBlog">
+        <template v-if="isSermonToBlog || isSmallGroupQuestions">
           <div class="space-y-1">
-            <h3 class="text-sm font-semibold text-foreground">Choose a sermon to turn into a blog post</h3>
+            <h3 class="text-sm font-semibold text-foreground">{{ isSmallGroupQuestions ? 'Choose a sermon to build small group questions' : 'Choose a sermon to turn into a blog post' }}</h3>
             <p class="text-xs text-muted-foreground">Select one of your 4 most recent saved sermons, or start without a saved sermon.</p>
           </div>
 
@@ -797,7 +838,7 @@ function handleSaveModalClose() {
             :disabled="isLoading"
             class="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
-            Start without a saved sermon
+            {{ isSmallGroupQuestions ? 'Start without a saved sermon (paste notes instead)' : 'Start without a saved sermon' }}
           </button>
         </template>
 
@@ -1017,6 +1058,18 @@ function handleSaveModalClose() {
       :is-saving="youtubeSaveStatus === 'saving'"
       :saved-id="savedYoutubeId"
       @save="handleSaveConfirmYoutube"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveSmallGroupModal
+      v-if="showSaveModal && isSmallGroupQuestions"
+      :save-status="smallGroupSaveStatus"
+      :preview="smallGroupPreview"
+      :save-error="smallGroupSaveError"
+      :is-saving="smallGroupSaveStatus === 'saving'"
+      :saved-id="savedGuideId"
+      @save="handleSaveConfirmSmallGroup"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />

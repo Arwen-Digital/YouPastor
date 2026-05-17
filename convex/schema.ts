@@ -167,6 +167,19 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_blog", ["blogId"]),
 
+  // Small group guides — saved from the Small Group Questions skill
+  smallGroupGuides: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    sermonId: v.optional(v.id("sermons")),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_sermon", ["sermonId"]),
+
   agentWorkflows: defineTable({
     userId: v.id("users"),
     sermonId: v.optional(v.id("sermons")),

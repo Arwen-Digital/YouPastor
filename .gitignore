@@ -31,3 +31,14 @@ dist-electron
 
 # Convex
 convex/_generated/
+
+# Local Docker setup
+Dockerfile.app
+Dockerfile.codex
+Dockerfile*
+docker-compose.yml
+docker-compose*.yml
+.dockerignore
+.dockerignore*
+.env.docker
+.env.docker.*

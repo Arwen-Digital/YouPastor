@@ -10,15 +10,16 @@ marked.setOptions({ breaks: true, gfm: true })
 const router = useRouter()
 const route = useRoute()
 
-// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional', 'blog', 'youtube'
+// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional', 'blog', 'youtube', 'smallGroup'
 const view = computed(() => {
-  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId && !route.params.blogId && !route.params.youtubeId) return 'list'
+  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId && !route.params.blogId && !route.params.youtubeId && !route.params.smallGroupId) return 'list'
   if (route.params.researchId) return 'research'
   if (route.params.brainstormId) return 'brainstorm'
   if (route.params.agendaId) return 'agenda'
   if (route.params.devotionalId) return 'devotional'
   if (route.params.blogId) return 'blog'
   if (route.params.youtubeId) return 'youtube'
+  if (route.params.smallGroupId) return 'smallGroup'
   if (route.params.id) return 'series'
   return 'list'
 })
@@ -30,6 +31,7 @@ const selectedAgendaId = computed(() => route.params.agendaId as string | undefi
 const selectedDevotionalId = computed(() => route.params.devotionalId as string | undefined)
 const selectedBlogId = computed(() => route.params.blogId as string | undefined)
 const selectedYoutubeId = computed(() => route.params.youtubeId as string | undefined)
+const selectedSmallGroupId = computed(() => route.params.smallGroupId as string | undefined)
 
 // ── Series list ──
 const seriesList = ref<any[]>([])
@@ -63,6 +65,10 @@ let blogListUnsub: (() => void) | null = null
 // ── YouTube drafts list ──
 const youtubeList = ref<any[]>([])
 let youtubeListUnsub: (() => void) | null = null
+
+// ── Small group guides list ──
+const smallGroupList = ref<any[]>([])
+let smallGroupListUnsub: (() => void) | null = null
 
 // ── Series detail ──
 const seriesDetail = ref<any>(null)
@@ -98,6 +104,11 @@ let blogDetailUnsub: (() => void) | null = null
 const youtubeDetail = ref<any>(null)
 const youtubeDetailLoading = ref(false)
 let youtubeDetailUnsub: (() => void) | null = null
+
+// ── Small group detail ──
+const smallGroupDetail = ref<any>(null)
+const smallGroupDetailLoading = ref(false)
+let smallGroupDetailUnsub: (() => void) | null = null
 
 // ── Series-linked items ──
 const seriesResearchNotes = ref<any[]>([])
@@ -171,6 +182,9 @@ onMounted(async () => {
     youtubeListUnsub = client.onUpdate('youtube/queries:listMine' as any, {}, (data: any) => {
       youtubeList.value = data ?? []
     })
+    smallGroupListUnsub = client.onUpdate('smallGroup/queries:listMine' as any, {}, (data: any) => {
+      smallGroupList.value = data ?? []
+    })
   } catch (err) {
     console.error('Failed to load notebook:', err)
     listLoading.value = false
@@ -186,6 +200,7 @@ onUnmounted(() => {
   devotionalListUnsub?.()
   blogListUnsub?.()
   youtubeListUnsub?.()
+  smallGroupListUnsub?.()
   detailUnsub?.()
   researchDetailUnsub?.()
   brainstormDetailUnsub?.()
@@ -193,6 +208,7 @@ onUnmounted(() => {
   devotionalDetailUnsub?.()
   blogDetailUnsub?.()
   youtubeDetailUnsub?.()
+  smallGroupDetailUnsub?.()
   seriesResearchUnsub?.()
   seriesBrainstormUnsub?.()
   seriesSermonsUnsub?.()
@@ -342,7 +358,24 @@ watch(selectedYoutubeId, async (newId) => {
   }
 }, { immediate: true })
 
-async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube', id: string) {
+watch(selectedSmallGroupId, async (newId) => {
+  if (smallGroupDetailUnsub) { smallGroupDetailUnsub(); smallGroupDetailUnsub = null }
+  smallGroupDetail.value = null
+  if (!newId) return
+  smallGroupDetailLoading.value = true
+  try {
+    const client = getConvexClient()
+    smallGroupDetailUnsub = client.onUpdate('smallGroup/queries:getById' as any, { guideId: newId }, (data: any) => {
+      smallGroupDetail.value = data
+      smallGroupDetailLoading.value = false
+    })
+  } catch (err) {
+    console.error('Failed to load small group guide:', err)
+    smallGroupDetailLoading.value = false
+  }
+}, { immediate: true })
+
+async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions', id: string) {
   if (!confirm('Delete this item? This cannot be undone.')) return
   deletingId.value = id
   try {
@@ -365,6 +398,9 @@ async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda
     } else if (type === 'youtube') {
       await client.mutation('youtube/mutations:remove' as any, { youtubeId: id })
       if (selectedYoutubeId.value === id) router.push('/notebook')
+    } else if (type === 'smallGroupQuestions') {
+      await client.mutation('smallGroup/mutations:remove' as any, { guideId: id })
+      if (selectedSmallGroupId.value === id) router.push('/notebook')
     } else {
       await client.mutation('research/mutations:remove' as any, { noteId: id })
       if (selectedResearchId.value === id) router.push('/notebook')
@@ -427,6 +463,7 @@ function getTypeBadge(type: string): { label: string; color: string } {
     case 'devotional': return { label: 'Devotional', color: 'bg-violet-500/10 text-violet-600' }
     case 'blog': return { label: 'Blog', color: 'bg-orange-500/10 text-orange-600' }
     case 'youtube': return { label: 'YouTube', color: 'bg-red-500/10 text-red-600' }
+    case 'smallGroupQuestions': return { label: 'Small Group', color: 'bg-teal-500/10 text-teal-700' }
     default: return { label: type, color: 'bg-muted text-muted-foreground' }
   }
 }
@@ -440,7 +477,7 @@ function getSeriesName(seriesId: string | undefined): string {
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
-    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube'
+    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions'
     id: string
     title: string
     subtitle: string
@@ -456,6 +493,7 @@ const combinedList = computed(() => {
     ...devotionalList.value.map(d => ({ type: 'devotional' as const, id: d._id, title: d.scriptureRef, subtitle: '', date: d.createdAt || 0, status: d.status || 'draft', tab: 'pastoral' as const })),
     ...blogList.value.map(b => ({ type: 'blog' as const, id: b._id, title: b.title, subtitle: '', date: b.createdAt || 0, status: b.status || 'draft', tab: 'content' as const })),
     ...youtubeList.value.map(y => ({ type: 'youtube' as const, id: y._id, title: y.title, subtitle: '', date: y.createdAt || 0, status: y.status || 'draft', tab: 'content' as const })),
+    ...smallGroupList.value.map(g => ({ type: 'smallGroupQuestions' as const, id: g._id, title: g.title || 'Small Group Questions', subtitle: '', date: g.createdAt || 0, status: g.status || 'draft', tab: 'content' as const })),
   ]
   return items.sort((a, b) => b.date - a.date)
 })
@@ -507,6 +545,7 @@ const filteredList = computed(() => {
             <template v-else-if="view === 'devotional'">Midweek devotional</template>
             <template v-else-if="view === 'blog'">Blog post</template>
             <template v-else-if="view === 'youtube'">YouTube package</template>
+            <template v-else-if="view === 'smallGroup'">Small Group Questions</template>
             <template v-else>Your saved work, organized by purpose</template>
           </p>
         </div>
@@ -701,7 +740,8 @@ const filteredList = computed(() => {
               : item.type === 'agenda' ? `/notebook/agenda/${item.id}`
               : item.type === 'devotional' ? `/notebook/devotional/${item.id}`
               : item.type === 'blog' ? `/notebook/blog/${item.id}`
-              : `/notebook/youtube/${item.id}`
+              : item.type === 'youtube' ? `/notebook/youtube/${item.id}`
+              : `/notebook/small-group/${item.id}`
             )"
             class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
@@ -713,6 +753,7 @@ const filteredList = computed(() => {
                 <Heart v-else-if="item.type === 'devotional'" class="h-5 w-5" />
                 <svg v-else-if="item.type === 'blog'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                 <Video v-else-if="item.type === 'youtube'" class="h-5 w-5" />
+                <BookOpen v-else-if="item.type === 'smallGroupQuestions'" class="h-5 w-5" />
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
@@ -1174,6 +1215,54 @@ const filteredList = computed(() => {
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">YouTube package not found</h3>
             <p class="text-sm text-muted-foreground">This YouTube package may have been deleted.</p>
+          </div>
+          <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Small Group Detail View -->
+    <div v-else-if="view === 'smallGroup'" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+        <div v-if="smallGroupDetailLoading" class="flex items-center justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
+        <div v-else-if="smallGroupDetail" class="space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ smallGroupDetail.title }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-teal-100 text-teal-700">Small Group</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="handleDelete('smallGroupQuestions', smallGroupDetail._id)"
+                :disabled="deletingId === smallGroupDetail._id"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div v-if="smallGroupDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground">
+            <div v-html="marked.parse(smallGroupDetail.content)" />
+          </div>
+
+          <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
+            <span v-if="smallGroupDetail.createdAt">Created {{ formatDate(smallGroupDetail.createdAt) }}</span>
+            <span v-if="smallGroupDetail.updatedAt && smallGroupDetail.updatedAt !== smallGroupDetail.createdAt">Updated {{ formatDate(smallGroupDetail.updatedAt) }}</span>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col items-center justify-center py-20 space-y-4">
+          <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center"><BookOpen class="h-8 w-8 text-muted-foreground" /></div>
+          <div class="text-center space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">Small Group Questions not found</h3>
+            <p class="text-sm text-muted-foreground">This guide may have been deleted.</p>
           </div>
           <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
         </div>
