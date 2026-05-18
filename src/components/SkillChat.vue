@@ -18,6 +18,7 @@ import { useSaveChurchSocial } from '@/composables/useSaveChurchSocial'
 import { useSaveSocialCalendar } from '@/composables/useSaveSocialCalendar'
 import { useSaveChurchEmail } from '@/composables/useSaveChurchEmail'
 import { useSaveAnnouncement } from '@/composables/useSaveAnnouncement'
+import { useSaveChurchLetter } from '@/composables/useSaveChurchLetter'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
@@ -30,6 +31,7 @@ import SaveChurchSocialModal from '@/components/SaveChurchSocialModal.vue'
 import SaveSocialCalendarModal from '@/components/SaveSocialCalendarModal.vue'
 import SaveChurchEmailModal from '@/components/SaveChurchEmailModal.vue'
 import SaveAnnouncementModal from '@/components/SaveAnnouncementModal.vue'
+import SaveChurchLetterModal from '@/components/SaveChurchLetterModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -132,8 +134,9 @@ const isChurchSocialPost = props.skillSlug === 'church-social-post'
 const isSocialMediaCalendar = props.skillSlug === 'social-media-calendar'
 const isChurchEmail = props.skillSlug === 'church-email'
 const isAnnouncementScript = props.skillSlug === 'announcement-script'
+const isChurchLetter = props.skillSlug === 'church-letter'
 const isIntakePhase = ref(true)
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter
 
 // Series save flow
 const {
@@ -266,6 +269,17 @@ const {
   save: confirmSaveAnnouncement,
   reset: resetAnnouncementSave,
 } = useSaveAnnouncement()
+
+// Church letter save flow
+const {
+  status: churchLetterSaveStatus,
+  preview: churchLetterPreview,
+  error: churchLetterSaveError,
+  savedLetterId,
+  extract: extractChurchLetter,
+  save: confirmSaveChurchLetter,
+  reset: resetChurchLetterSave,
+} = useSaveChurchLetter()
 
 const showSaveModal = ref(false)
 
@@ -406,7 +420,7 @@ const canSave = computed(() => {
   if (isLoading.value) return false
 
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
-  const isGenericContentSkill = isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript
+  const isGenericContentSkill = isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter
   // Hard fallback so Save can't get stuck inactive if model never emits SKILL_READY.
   const intakeBypass = isGenericContentSkill && assistantMsgs >= 4
   if (isIntakePhase.value && !intakeBypass) return false
@@ -422,6 +436,7 @@ const canSave = computed(() => {
     : isSocialMediaCalendar ? socialCalendarSaveStatus.value
     : isChurchEmail ? churchEmailSaveStatus.value
     : isAnnouncementScript ? announcementSaveStatus.value
+    : isChurchLetter ? churchLetterSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
 
@@ -429,7 +444,7 @@ const canSave = computed(() => {
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
   // Blog/YouTube should generally appear near the end of staged output.
-  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : (isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript) ? 3 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
+  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : (isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter) ? 3 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -574,7 +589,15 @@ function looksLikeFinalSocialDeliverable(content: string): boolean {
     text.includes('channel notes') ||
     text.includes('why this works')
 
-  return content.length > 500 && (hasSocialSections || hasCalendarSections || hasChurchEmailSections || hasAnnouncementSections)
+  // Church Letter common final structure hints
+  const hasChurchLetterSections =
+    text.includes('church letter') ||
+    text.includes('pastoral letter') ||
+    text.includes('opening paragraph') ||
+    text.includes('closing blessing') ||
+    text.includes('why this works')
+
+  return content.length > 500 && (hasSocialSections || hasCalendarSections || hasChurchEmailSections || hasAnnouncementSections || hasChurchLetterSections)
 }
 
 async function handleAssistantResponse(responseContent: string) {
@@ -603,7 +626,7 @@ async function handleAssistantResponse(responseContent: string) {
 
   // Fallback: if model skips SKILL_READY but clearly outputs final deliverable,
   // unlock save by ending intake phase without forcing another generation turn.
-  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript) && isIntakePhase.value && looksLikeFinalSocialDeliverable(responseContent)) {
+  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter) && isIntakePhase.value && looksLikeFinalSocialDeliverable(responseContent)) {
     isIntakePhase.value = false
     setRole('generator')
     currentSystemPrompt.value = baseSystemPrompt.value
@@ -611,7 +634,7 @@ async function handleAssistantResponse(responseContent: string) {
   }
 
   // Safety fallback: after enough assistant turns, don't block Save behind intake state.
-  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript) && isIntakePhase.value) {
+  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter) && isIntakePhase.value) {
     const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
     if (assistantMsgs >= 4) {
       isIntakePhase.value = false
@@ -772,6 +795,7 @@ async function handleSaveClick() {
   if (isSocialMediaCalendar) resetSocialCalendarSave()
   if (isChurchEmail) resetChurchEmailSave()
   if (isAnnouncementScript) resetAnnouncementSave()
+  if (isChurchLetter) resetChurchLetterSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -803,6 +827,8 @@ async function handleSaveClick() {
     await extractChurchEmail(extractionMessages as any)
   } else if (isAnnouncementScript) {
     await extractAnnouncement(extractionMessages as any)
+  } else if (isChurchLetter) {
+    await extractChurchLetter(extractionMessages as any)
   }
 }
 
@@ -854,6 +880,10 @@ function handleSaveConfirmAnnouncement(data: any) {
   confirmSaveAnnouncement(data)
 }
 
+function handleSaveConfirmChurchLetter(data: any) {
+  confirmSaveChurchLetter(data)
+}
+
 function handleSaveModalClose() {
   showSaveModal.value = false
   if (isSeriesPlanner && seriesSaveStatus.value === 'saved' && savedSeriesId.value) {
@@ -903,6 +933,10 @@ function handleSaveModalClose() {
     const announcementId = savedAnnouncementId.value
     resetAnnouncementSave()
     router.push(`/notebook/announcement/${announcementId}`)
+  } else if (isChurchLetter && churchLetterSaveStatus.value === 'saved' && savedLetterId.value) {
+    const letterId = savedLetterId.value
+    resetChurchLetterSave()
+    router.push(`/notebook/church-letter/${letterId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -939,6 +973,9 @@ function handleSaveModalClose() {
   } else if (announcementSaveStatus.value === 'saved') {
     resetAnnouncementSave()
     router.push('/notebook?tab=content&filter=announcementScript')
+  } else if (churchLetterSaveStatus.value === 'saved') {
+    resetChurchLetterSave()
+    router.push('/notebook?tab=content&filter=churchLetter')
   }
 }
 </script>
@@ -1303,6 +1340,18 @@ function handleSaveModalClose() {
       :is-saving="announcementSaveStatus === 'saving'"
       :saved-id="savedAnnouncementId"
       @save="handleSaveConfirmAnnouncement"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveChurchLetterModal
+      v-if="showSaveModal && isChurchLetter"
+      :save-status="churchLetterSaveStatus"
+      :preview="churchLetterPreview"
+      :save-error="churchLetterSaveError"
+      :is-saving="churchLetterSaveStatus === 'saving'"
+      :saved-id="savedLetterId"
+      @save="handleSaveConfirmChurchLetter"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />

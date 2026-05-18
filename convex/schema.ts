@@ -224,6 +224,17 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]),
 
+  // Church letters — saved from the Church Letter skill
+  churchLetters: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
   agentWorkflows: defineTable({
     userId: v.id("users"),
     sermonId: v.optional(v.id("sermons")),
