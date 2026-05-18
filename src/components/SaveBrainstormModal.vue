@@ -181,7 +181,7 @@ function handleSave() {
         <button
           @click="handleSave"
           :disabled="!canSave || isSaving"
-          class="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          class="save-notebook-btn px-5 py-2 text-sm font-medium"
         >
           <Loader2 v-if="isSaving" class="h-4 w-4 animate-spin" />
           <span>{{ isSaving ? 'Saving...' : 'Save to Notebook' }}</span>

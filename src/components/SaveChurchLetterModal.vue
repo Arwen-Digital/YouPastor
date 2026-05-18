@@ -101,7 +101,7 @@ function handleSave() {
 
       <div v-if="form && saveStatus !== 'saved'" class="flex items-center justify-end gap-3 px-6 py-4 border-t border-border shrink-0">
         <button @click="$emit('close')" class="rounded-md px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
-        <button @click="handleSave" :disabled="!canSave || isSaving" class="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
+        <button @click="handleSave" :disabled="!canSave || isSaving" class="save-notebook-btn px-5 py-2 text-sm font-medium">
           <Loader2 v-if="isSaving" class="h-4 w-4 animate-spin" />
           <span>{{ isSaving ? 'Saving...' : 'Save to Notebook' }}</span>
         </button>
