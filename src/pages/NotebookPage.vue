@@ -693,6 +693,28 @@ function openWeekInResearch(week: any) {
   })
 }
 
+function openWeekInCreateSermon(week: any) {
+  if (!seriesDetail.value?.series?._id) return
+  router.push({
+    name: 'sermon-flow',
+    params: {
+      action: 'create',
+      mode: 'series',
+      seriesId: String(seriesDetail.value.series._id),
+    },
+    query: {
+      fromNotebook: '1',
+      seriesId: String(seriesDetail.value.series._id ?? ''),
+      seriesTitle: String(seriesDetail.value.series.title ?? ''),
+      weekNumber: String(week.weekNumber ?? ''),
+      sermonTitle: String(week.sermonTitle ?? ''),
+      scriptureRef: String(week.scriptureRef ?? ''),
+      bigIdea: String(week.bigIdea ?? ''),
+      connectiveThread: String(week.connectiveThread ?? ''),
+    },
+  })
+}
+
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
@@ -1100,6 +1122,12 @@ const filteredList = computed(() => {
                       class="inline-flex items-center rounded-md border border-blue-300/60 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
                     >
                       Research
+                    </button>
+                    <button
+                      @click="openWeekInCreateSermon(week)"
+                      class="inline-flex items-center rounded-md border border-emerald-300/60 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      Create Sermon
                     </button>
                   </div>
                 </div>

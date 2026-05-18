@@ -148,6 +148,80 @@ const saveStatusText = computed(() => {
   return 'Not saved yet'
 })
 
+function queryValue(name: string): string {
+  const value = route.query[name]
+  if (Array.isArray(value)) return value[0] ?? ''
+  return value ? String(value) : ''
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+const lastAppliedNotebookPrefillKey = ref<string | null>(null)
+
+function applyNotebookPrefillFromQuery() {
+  if (action.value !== 'create') return
+  if (currentSermonId.value) return
+  if (queryValue('fromNotebook') !== '1') return
+
+  const seriesTitle = queryValue('seriesTitle')
+  const weekNumber = queryValue('weekNumber')
+  const sermonTitleFromWeek = queryValue('sermonTitle')
+  const scriptureFromWeek = queryValue('scriptureRef')
+  const bigIdea = queryValue('bigIdea')
+  const connectiveThread = queryValue('connectiveThread')
+
+  const prefillKey = [
+    routeSeriesId.value ?? '',
+    weekNumber,
+    sermonTitleFromWeek,
+    scriptureFromWeek,
+    bigIdea,
+    connectiveThread,
+    seriesTitle,
+  ].join('|')
+
+  if (lastAppliedNotebookPrefillKey.value === prefillKey) return
+  lastAppliedNotebookPrefillKey.value = prefillKey
+
+  const titleCandidate = sermonTitleFromWeek || (weekNumber ? `Week ${weekNumber} Sermon` : '')
+  if (titleCandidate) title.value = titleCandidate
+  if (scriptureFromWeek) scriptureRef.value = scriptureFromWeek
+
+  const sections: string[] = []
+  if (seriesTitle || weekNumber) {
+    const meta: string[] = []
+    if (seriesTitle) meta.push(`<strong>Series:</strong> ${escapeHtml(seriesTitle)}`)
+    if (weekNumber) meta.push(`<strong>Week:</strong> ${escapeHtml(weekNumber)}`)
+    sections.push(`<p>${meta.join(' &nbsp;•&nbsp; ')}</p>`)
+  }
+  if (bigIdea) sections.push(`<h2>Big Idea</h2><p>${escapeHtml(bigIdea)}</p>`)
+  if (connectiveThread) sections.push(`<h2>Connective Thread</h2><p>${escapeHtml(connectiveThread)}</p>`)
+
+  if (sections.length > 0) {
+    sections.push('<h2>Outline</h2><ul><li></li><li></li><li></li></ul>')
+    const prefillHtml = sections.join('')
+    contentHtml.value = prefillHtml
+    if (editor.value) {
+      editor.value.commands.setContent(prefillHtml)
+    }
+  }
+}
+
+watch(
+  () => [route.fullPath, action.value, currentSermonId.value ?? '', !!editor.value],
+  () => {
+    applyNotebookPrefillFromQuery()
+  },
+  { immediate: true }
+)
+
 watch(routeSermonId, (sermonId) => {
   selectedSermonUnsub?.()
   selectedSermonUnsub = null
