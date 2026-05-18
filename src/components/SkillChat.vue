@@ -534,7 +534,17 @@ function looksLikeFinalSocialDeliverable(content: string): boolean {
     text.includes('| monday') ||
     text.includes('monday |')
 
-  return content.length > 700 && (hasSocialSections || hasCalendarSections)
+  // Church Email common final structure hints
+  const hasChurchEmailSections =
+    text.includes('**lead item:**') ||
+    text.includes('**supporting items:**') ||
+    text.includes('**cut or defer:**') ||
+    text.includes('preview text') ||
+    text.includes('subject line') ||
+    text.includes('final checklist') ||
+    text.includes('why this works')
+
+  return content.length > 500 && (hasSocialSections || hasCalendarSections || hasChurchEmailSections)
 }
 
 async function handleAssistantResponse(responseContent: string) {
@@ -563,7 +573,7 @@ async function handleAssistantResponse(responseContent: string) {
 
   // Fallback: if model skips SKILL_READY but clearly outputs final social deliverable,
   // unlock save by ending intake phase without forcing another generation turn.
-  if ((isChurchSocialPost || isSocialMediaCalendar) && isIntakePhase.value && looksLikeFinalSocialDeliverable(responseContent)) {
+  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail) && isIntakePhase.value && looksLikeFinalSocialDeliverable(responseContent)) {
     isIntakePhase.value = false
     setRole('generator')
     currentSystemPrompt.value = baseSystemPrompt.value
