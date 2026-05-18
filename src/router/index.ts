@@ -80,6 +80,11 @@ const routes = [
         component: () => import('@/pages/NotebookPage.vue'),
       },
       {
+        path: 'notebook/announcement/:announcementId',
+        name: 'notebook-announcement-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
         path: 'notebook/:id',
         name: 'notebook-detail',
         component: () => import('@/pages/NotebookPage.vue'),

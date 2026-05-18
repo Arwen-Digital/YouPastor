@@ -10,9 +10,9 @@ marked.setOptions({ breaks: true, gfm: true })
 const router = useRouter()
 const route = useRoute()
 
-// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional', 'blog', 'youtube', 'smallGroup', 'churchSocial', 'socialCalendar', 'churchEmail'
+// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional', 'blog', 'youtube', 'smallGroup', 'churchSocial', 'socialCalendar', 'churchEmail', 'announcement'
 const view = computed(() => {
-  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId && !route.params.blogId && !route.params.youtubeId && !route.params.smallGroupId && !route.params.churchSocialId && !route.params.calendarId && !route.params.churchEmailId) return 'list'
+  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId && !route.params.blogId && !route.params.youtubeId && !route.params.smallGroupId && !route.params.churchSocialId && !route.params.calendarId && !route.params.churchEmailId && !route.params.announcementId) return 'list'
   if (route.params.researchId) return 'research'
   if (route.params.brainstormId) return 'brainstorm'
   if (route.params.agendaId) return 'agenda'
@@ -23,6 +23,7 @@ const view = computed(() => {
   if (route.params.churchSocialId) return 'churchSocial'
   if (route.params.calendarId) return 'socialCalendar'
   if (route.params.churchEmailId) return 'churchEmail'
+  if (route.params.announcementId) return 'announcement'
   if (route.params.id) return 'series'
   return 'list'
 })
@@ -38,6 +39,7 @@ const selectedSmallGroupId = computed(() => route.params.smallGroupId as string 
 const selectedChurchSocialId = computed(() => route.params.churchSocialId as string | undefined)
 const selectedCalendarId = computed(() => route.params.calendarId as string | undefined)
 const selectedChurchEmailId = computed(() => route.params.churchEmailId as string | undefined)
+const selectedAnnouncementId = computed(() => route.params.announcementId as string | undefined)
 
 // ── Series list ──
 const seriesList = ref<any[]>([])
@@ -87,6 +89,10 @@ let socialCalendarListUnsub: (() => void) | null = null
 // ── Church email list ──
 const churchEmailList = ref<any[]>([])
 let churchEmailListUnsub: (() => void) | null = null
+
+// ── Announcement script list ──
+const announcementList = ref<any[]>([])
+let announcementListUnsub: (() => void) | null = null
 
 // ── Series detail ──
 const seriesDetail = ref<any>(null)
@@ -142,6 +148,11 @@ let socialCalendarDetailUnsub: (() => void) | null = null
 const churchEmailDetail = ref<any>(null)
 const churchEmailDetailLoading = ref(false)
 let churchEmailDetailUnsub: (() => void) | null = null
+
+// ── Announcement script detail ──
+const announcementDetail = ref<any>(null)
+const announcementDetailLoading = ref(false)
+let announcementDetailUnsub: (() => void) | null = null
 
 // ── Series-linked items ──
 const seriesResearchNotes = ref<any[]>([])
@@ -227,6 +238,9 @@ onMounted(async () => {
     churchEmailListUnsub = client.onUpdate('churchEmail/queries:listMine' as any, {}, (data: any) => {
       churchEmailList.value = data ?? []
     })
+    announcementListUnsub = client.onUpdate('announcement/queries:listMine' as any, {}, (data: any) => {
+      announcementList.value = data ?? []
+    })
   } catch (err) {
     console.error('Failed to load notebook:', err)
     listLoading.value = false
@@ -246,6 +260,7 @@ onUnmounted(() => {
   churchSocialListUnsub?.()
   socialCalendarListUnsub?.()
   churchEmailListUnsub?.()
+  announcementListUnsub?.()
   detailUnsub?.()
   researchDetailUnsub?.()
   brainstormDetailUnsub?.()
@@ -257,6 +272,7 @@ onUnmounted(() => {
   churchSocialDetailUnsub?.()
   socialCalendarDetailUnsub?.()
   churchEmailDetailUnsub?.()
+  announcementDetailUnsub?.()
   seriesResearchUnsub?.()
   seriesBrainstormUnsub?.()
   seriesSermonsUnsub?.()
@@ -474,7 +490,24 @@ watch(selectedChurchEmailId, async (newId) => {
   }
 }, { immediate: true })
 
-async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost' | 'socialMediaCalendar' | 'churchEmail', id: string) {
+watch(selectedAnnouncementId, async (newId) => {
+  if (announcementDetailUnsub) { announcementDetailUnsub(); announcementDetailUnsub = null }
+  announcementDetail.value = null
+  if (!newId) return
+  announcementDetailLoading.value = true
+  try {
+    const client = getConvexClient()
+    announcementDetailUnsub = client.onUpdate('announcement/queries:getById' as any, { announcementId: newId }, (data: any) => {
+      announcementDetail.value = data
+      announcementDetailLoading.value = false
+    })
+  } catch (err) {
+    console.error('Failed to load announcement script:', err)
+    announcementDetailLoading.value = false
+  }
+}, { immediate: true })
+
+async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost' | 'socialMediaCalendar' | 'churchEmail' | 'announcementScript', id: string) {
   if (!confirm('Delete this item? This cannot be undone.')) return
   deletingId.value = id
   try {
@@ -509,6 +542,9 @@ async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda
     } else if (type === 'churchEmail') {
       await client.mutation('churchEmail/mutations:remove' as any, { emailId: id })
       if (selectedChurchEmailId.value === id) router.push('/notebook')
+    } else if (type === 'announcementScript') {
+      await client.mutation('announcement/mutations:remove' as any, { announcementId: id })
+      if (selectedAnnouncementId.value === id) router.push('/notebook')
     } else {
       await client.mutation('research/mutations:remove' as any, { noteId: id })
       if (selectedResearchId.value === id) router.push('/notebook')
@@ -575,6 +611,7 @@ function getTypeBadge(type: string): { label: string; color: string } {
     case 'churchSocialPost': return { label: 'Church Social', color: 'bg-pink-500/10 text-pink-700' }
     case 'socialMediaCalendar': return { label: 'Social Calendar', color: 'bg-indigo-500/10 text-indigo-700' }
     case 'churchEmail': return { label: 'Church Email', color: 'bg-cyan-500/10 text-cyan-700' }
+    case 'announcementScript': return { label: 'Announcement', color: 'bg-lime-500/10 text-lime-700' }
     default: return { label: type, color: 'bg-muted text-muted-foreground' }
   }
 }
@@ -588,7 +625,7 @@ function getSeriesName(seriesId: string | undefined): string {
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
-    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost' | 'socialMediaCalendar' | 'churchEmail'
+    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost' | 'socialMediaCalendar' | 'churchEmail' | 'announcementScript'
     id: string
     title: string
     subtitle: string
@@ -608,6 +645,7 @@ const combinedList = computed(() => {
     ...churchSocialList.value.map(p => ({ type: 'churchSocialPost' as const, id: p._id, title: p.title || 'Church Social Post', subtitle: '', date: p.createdAt || 0, status: p.status || 'draft', tab: 'content' as const })),
     ...socialCalendarList.value.map(c => ({ type: 'socialMediaCalendar' as const, id: c._id, title: c.title || 'Social Media Calendar', subtitle: '', date: c.createdAt || 0, status: c.status || 'draft', tab: 'content' as const })),
     ...churchEmailList.value.map(e => ({ type: 'churchEmail' as const, id: e._id, title: e.title || 'Church Email', subtitle: '', date: e.createdAt || 0, status: e.status || 'draft', tab: 'content' as const })),
+    ...announcementList.value.map(a => ({ type: 'announcementScript' as const, id: a._id, title: a.title || 'Announcement Script', subtitle: '', date: a.createdAt || 0, status: a.status || 'draft', tab: 'content' as const })),
   ]
   return items.sort((a, b) => b.date - a.date)
 })
@@ -663,6 +701,7 @@ const filteredList = computed(() => {
             <template v-else-if="view === 'churchSocial'">Church Social Post</template>
             <template v-else-if="view === 'socialCalendar'">Social Media Calendar</template>
             <template v-else-if="view === 'churchEmail'">Church Email</template>
+            <template v-else-if="view === 'announcement'">Announcement Script</template>
             <template v-else>Your saved work, organized by purpose</template>
           </p>
         </div>
@@ -861,7 +900,8 @@ const filteredList = computed(() => {
               : item.type === 'smallGroupQuestions' ? `/notebook/small-group/${item.id}`
               : item.type === 'churchSocialPost' ? `/notebook/church-social/${item.id}`
               : item.type === 'socialMediaCalendar' ? `/notebook/social-calendar/${item.id}`
-              : `/notebook/church-email/${item.id}`
+              : item.type === 'churchEmail' ? `/notebook/church-email/${item.id}`
+              : `/notebook/announcement/${item.id}`
             )"
             class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
@@ -877,6 +917,7 @@ const filteredList = computed(() => {
                 <svg v-else-if="item.type === 'churchSocialPost'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6.1H3"/><path d="M21 12.1H3"/><path d="M15.1 18H3"/></svg>
                 <CalendarDays v-else-if="item.type === 'socialMediaCalendar'" class="h-5 w-5" />
                 <svg v-else-if="item.type === 'churchEmail'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+                <svg v-else-if="item.type === 'announcementScript'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v3a1 1 0 0 0 1 1h3"/><path d="M7 11l10-5v12L7 13"/><path d="M11 14v4a1 1 0 0 0 1 1h2"/></svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
@@ -1530,6 +1571,54 @@ const filteredList = computed(() => {
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">Church Email not found</h3>
             <p class="text-sm text-muted-foreground">This email may have been deleted.</p>
+          </div>
+          <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Announcement Script Detail View -->
+    <div v-else-if="view === 'announcement'" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+        <div v-if="announcementDetailLoading" class="flex items-center justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
+        <div v-else-if="announcementDetail" class="space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ announcementDetail.title }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-lime-100 text-lime-700">Announcement</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="handleDelete('announcementScript', announcementDetail._id)"
+                :disabled="deletingId === announcementDetail._id"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div v-if="announcementDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground">
+            <div v-html="marked.parse(announcementDetail.content)" />
+          </div>
+
+          <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
+            <span v-if="announcementDetail.createdAt">Created {{ formatDate(announcementDetail.createdAt) }}</span>
+            <span v-if="announcementDetail.updatedAt && announcementDetail.updatedAt !== announcementDetail.createdAt">Updated {{ formatDate(announcementDetail.updatedAt) }}</span>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col items-center justify-center py-20 space-y-4">
+          <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center"><BookOpen class="h-8 w-8 text-muted-foreground" /></div>
+          <div class="text-center space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">Announcement Script not found</h3>
+            <p class="text-sm text-muted-foreground">This script may have been deleted.</p>
           </div>
           <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
         </div>
