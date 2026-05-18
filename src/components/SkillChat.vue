@@ -473,6 +473,16 @@ const canSave = computed(() => {
   return assistantMsgs >= threshold
 })
 
+const insufficientCreditsMessage = computed(() => {
+  const msg = error.value?.message ?? ''
+  const match = msg.match(/INSUFFICIENT_CREDITS:\s*(.*)$/s)
+  return match?.[1]?.trim() || null
+})
+
+function goToBilling() {
+  router.push('/settings')
+}
+
 function renderMarkdown(content: string): string {
   return marked.parse(content) as string
 }
@@ -1186,7 +1196,17 @@ function handleSaveModalClose() {
       </div>
 
       <div v-if="error" class="flex justify-center">
-        <div class="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive max-w-[80%]">
+        <div v-if="insufficientCreditsMessage" class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 max-w-[80%]">
+          <p class="font-semibold mb-1">Not enough credits</p>
+          <p>{{ insufficientCreditsMessage }}</p>
+          <button
+            @click="goToBilling"
+            class="mt-3 inline-flex items-center rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500 transition-colors"
+          >
+            Manage credits
+          </button>
+        </div>
+        <div v-else class="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive max-w-[80%]">
           <p class="font-semibold mb-1">Something went wrong</p>
           <p>{{ error.message || String(error) }}</p>
         </div>

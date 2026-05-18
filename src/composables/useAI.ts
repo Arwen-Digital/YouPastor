@@ -8,8 +8,10 @@ import type {
 } from '@/lib/ai/types'
 import { getProviderForRole } from '@/lib/ai/factory'
 import { getConvexClient } from '@/lib/convex'
+import { useAuthStore } from '@/stores/auth'
 
 export function useAI(initialRole: AIRole = 'orchestrator') {
+  const auth = useAuthStore()
   const isLoading = ref(false)
   const error: Ref<Error | null> = ref(null)
   const streamingContent = ref('')
@@ -59,6 +61,10 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
           creditsCharged: actionResult?.creditsCharged,
           remainingCredits: actionResult?.remainingCredits,
           providerCostUsdMicros: actionResult?.providerCostUsdMicros,
+        }
+
+        if (typeof actionResult?.remainingCredits === 'number') {
+          auth.setCreditBalance(actionResult.remainingCredits)
         }
       } else {
         result = await provider.chat({ messages, ...options })

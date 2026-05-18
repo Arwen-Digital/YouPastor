@@ -250,6 +250,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function setCreditBalance(balance: number) {
+    if (user.value) {
+      user.value = { ...user.value, creditBalance: Math.max(0, Math.floor(balance)) }
+    }
+  }
+
   return {
     user,
     isAuthenticated,
@@ -263,6 +269,7 @@ export const useAuthStore = defineStore('auth', () => {
     fetchUser,
     clearError,
     markOnboardingComplete,
+    setCreditBalance,
   }
 })
 
