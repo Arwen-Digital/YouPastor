@@ -83,4 +83,9 @@
   .save-notebook-btn:disabled {
     @apply opacity-50 cursor-not-allowed;
   }
+
+  /* Sermon editor – keep bullet lines tight */
+  .sermon-editor li > p {
+    @apply my-0;
+  }
 }
