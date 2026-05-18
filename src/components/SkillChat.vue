@@ -15,6 +15,7 @@ import { useSaveBlog } from '@/composables/useSaveBlog'
 import { useSaveYoutube } from '@/composables/useSaveYoutube'
 import { useSaveSmallGroup } from '@/composables/useSaveSmallGroup'
 import { useSaveChurchSocial } from '@/composables/useSaveChurchSocial'
+import { useSaveSocialCalendar } from '@/composables/useSaveSocialCalendar'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
@@ -24,6 +25,7 @@ import SaveBlogModal from '@/components/SaveBlogModal.vue'
 import SaveYoutubeModal from '@/components/SaveYoutubeModal.vue'
 import SaveSmallGroupModal from '@/components/SaveSmallGroupModal.vue'
 import SaveChurchSocialModal from '@/components/SaveChurchSocialModal.vue'
+import SaveSocialCalendarModal from '@/components/SaveSocialCalendarModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -123,8 +125,9 @@ const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
 const isSermonToYoutube = props.skillSlug === 'sermon-to-youtube'
 const isSmallGroupQuestions = props.skillSlug === 'small-group-questions'
 const isChurchSocialPost = props.skillSlug === 'church-social-post'
+const isSocialMediaCalendar = props.skillSlug === 'social-media-calendar'
 const isIntakePhase = ref(true)
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost || isSocialMediaCalendar
 
 // Series save flow
 const {
@@ -224,6 +227,17 @@ const {
   save: confirmSaveChurchSocial,
   reset: resetChurchSocialSave,
 } = useSaveChurchSocial()
+
+// Social media calendar save flow
+const {
+  status: socialCalendarSaveStatus,
+  preview: socialCalendarPreview,
+  error: socialCalendarSaveError,
+  savedCalendarId,
+  extract: extractSocialCalendar,
+  save: confirmSaveSocialCalendar,
+  reset: resetSocialCalendarSave,
+} = useSaveSocialCalendar()
 
 const showSaveModal = ref(false)
 
@@ -371,6 +385,7 @@ const canSave = computed(() => {
     : isSermonToYoutube ? youtubeSaveStatus.value
     : isSmallGroupQuestions ? smallGroupSaveStatus.value
     : isChurchSocialPost ? churchSocialSaveStatus.value
+    : isSocialMediaCalendar ? socialCalendarSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
@@ -378,7 +393,7 @@ const canSave = computed(() => {
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
   // Blog/YouTube should generally appear near the end of staged output.
-  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : isChurchSocialPost ? 3 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
+  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : (isChurchSocialPost || isSocialMediaCalendar) ? 3 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -655,6 +670,7 @@ async function handleSaveClick() {
   if (isSermonToYoutube) resetYoutubeSave()
   if (isSmallGroupQuestions) resetSmallGroupSave()
   if (isChurchSocialPost) resetChurchSocialSave()
+  if (isSocialMediaCalendar) resetSocialCalendarSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -680,6 +696,8 @@ async function handleSaveClick() {
     await extractSmallGroup(extractionMessages as any, selectedSermonId.value)
   } else if (isChurchSocialPost) {
     await extractChurchSocial(extractionMessages as any)
+  } else if (isSocialMediaCalendar) {
+    await extractSocialCalendar(extractionMessages as any)
   }
 }
 
@@ -719,6 +737,10 @@ function handleSaveConfirmChurchSocial(data: any) {
   confirmSaveChurchSocial(data)
 }
 
+function handleSaveConfirmSocialCalendar(data: any) {
+  confirmSaveSocialCalendar(data)
+}
+
 function handleSaveModalClose() {
   showSaveModal.value = false
   if (isSeriesPlanner && seriesSaveStatus.value === 'saved' && savedSeriesId.value) {
@@ -756,6 +778,10 @@ function handleSaveModalClose() {
     const postId = savedPostId.value
     resetChurchSocialSave()
     router.push(`/notebook/church-social/${postId}`)
+  } else if (isSocialMediaCalendar && socialCalendarSaveStatus.value === 'saved' && savedCalendarId.value) {
+    const calendarId = savedCalendarId.value
+    resetSocialCalendarSave()
+    router.push(`/notebook/social-calendar/${calendarId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -783,6 +809,9 @@ function handleSaveModalClose() {
   } else if (churchSocialSaveStatus.value === 'saved') {
     resetChurchSocialSave()
     router.push('/notebook?tab=content&filter=churchSocialPost')
+  } else if (socialCalendarSaveStatus.value === 'saved') {
+    resetSocialCalendarSave()
+    router.push('/notebook?tab=content&filter=socialMediaCalendar')
   }
 }
 </script>
@@ -1111,6 +1140,18 @@ function handleSaveModalClose() {
       :is-saving="churchSocialSaveStatus === 'saving'"
       :saved-id="savedPostId"
       @save="handleSaveConfirmChurchSocial"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveSocialCalendarModal
+      v-if="showSaveModal && isSocialMediaCalendar"
+      :save-status="socialCalendarSaveStatus"
+      :preview="socialCalendarPreview"
+      :save-error="socialCalendarSaveError"
+      :is-saving="socialCalendarSaveStatus === 'saving'"
+      :saved-id="savedCalendarId"
+      @save="handleSaveConfirmSocialCalendar"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />

@@ -70,6 +70,11 @@ const routes = [
         component: () => import('@/pages/NotebookPage.vue'),
       },
       {
+        path: 'notebook/social-calendar/:calendarId',
+        name: 'notebook-social-calendar-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
         path: 'notebook/:id',
         name: 'notebook-detail',
         component: () => import('@/pages/NotebookPage.vue'),

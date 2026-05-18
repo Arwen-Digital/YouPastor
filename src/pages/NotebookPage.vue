@@ -10,9 +10,9 @@ marked.setOptions({ breaks: true, gfm: true })
 const router = useRouter()
 const route = useRoute()
 
-// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional', 'blog', 'youtube', 'smallGroup', 'churchSocial'
+// Which view: 'list', 'series', 'research', 'brainstorm', 'agenda', 'devotional', 'blog', 'youtube', 'smallGroup', 'churchSocial', 'socialCalendar'
 const view = computed(() => {
-  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId && !route.params.blogId && !route.params.youtubeId && !route.params.smallGroupId && !route.params.churchSocialId) return 'list'
+  if (!route.params.id && !route.params.researchId && !route.params.brainstormId && !route.params.agendaId && !route.params.devotionalId && !route.params.blogId && !route.params.youtubeId && !route.params.smallGroupId && !route.params.churchSocialId && !route.params.calendarId) return 'list'
   if (route.params.researchId) return 'research'
   if (route.params.brainstormId) return 'brainstorm'
   if (route.params.agendaId) return 'agenda'
@@ -21,6 +21,7 @@ const view = computed(() => {
   if (route.params.youtubeId) return 'youtube'
   if (route.params.smallGroupId) return 'smallGroup'
   if (route.params.churchSocialId) return 'churchSocial'
+  if (route.params.calendarId) return 'socialCalendar'
   if (route.params.id) return 'series'
   return 'list'
 })
@@ -34,6 +35,7 @@ const selectedBlogId = computed(() => route.params.blogId as string | undefined)
 const selectedYoutubeId = computed(() => route.params.youtubeId as string | undefined)
 const selectedSmallGroupId = computed(() => route.params.smallGroupId as string | undefined)
 const selectedChurchSocialId = computed(() => route.params.churchSocialId as string | undefined)
+const selectedCalendarId = computed(() => route.params.calendarId as string | undefined)
 
 // ── Series list ──
 const seriesList = ref<any[]>([])
@@ -75,6 +77,10 @@ let smallGroupListUnsub: (() => void) | null = null
 // ── Church social posts list ──
 const churchSocialList = ref<any[]>([])
 let churchSocialListUnsub: (() => void) | null = null
+
+// ── Social media calendar list ──
+const socialCalendarList = ref<any[]>([])
+let socialCalendarListUnsub: (() => void) | null = null
 
 // ── Series detail ──
 const seriesDetail = ref<any>(null)
@@ -120,6 +126,11 @@ let smallGroupDetailUnsub: (() => void) | null = null
 const churchSocialDetail = ref<any>(null)
 const churchSocialDetailLoading = ref(false)
 let churchSocialDetailUnsub: (() => void) | null = null
+
+// ── Social media calendar detail ──
+const socialCalendarDetail = ref<any>(null)
+const socialCalendarDetailLoading = ref(false)
+let socialCalendarDetailUnsub: (() => void) | null = null
 
 // ── Series-linked items ──
 const seriesResearchNotes = ref<any[]>([])
@@ -199,6 +210,9 @@ onMounted(async () => {
     churchSocialListUnsub = client.onUpdate('churchSocial/queries:listMine' as any, {}, (data: any) => {
       churchSocialList.value = data ?? []
     })
+    socialCalendarListUnsub = client.onUpdate('socialCalendar/queries:listMine' as any, {}, (data: any) => {
+      socialCalendarList.value = data ?? []
+    })
   } catch (err) {
     console.error('Failed to load notebook:', err)
     listLoading.value = false
@@ -216,6 +230,7 @@ onUnmounted(() => {
   youtubeListUnsub?.()
   smallGroupListUnsub?.()
   churchSocialListUnsub?.()
+  socialCalendarListUnsub?.()
   detailUnsub?.()
   researchDetailUnsub?.()
   brainstormDetailUnsub?.()
@@ -225,6 +240,7 @@ onUnmounted(() => {
   youtubeDetailUnsub?.()
   smallGroupDetailUnsub?.()
   churchSocialDetailUnsub?.()
+  socialCalendarDetailUnsub?.()
   seriesResearchUnsub?.()
   seriesBrainstormUnsub?.()
   seriesSermonsUnsub?.()
@@ -408,7 +424,24 @@ watch(selectedChurchSocialId, async (newId) => {
   }
 }, { immediate: true })
 
-async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost', id: string) {
+watch(selectedCalendarId, async (newId) => {
+  if (socialCalendarDetailUnsub) { socialCalendarDetailUnsub(); socialCalendarDetailUnsub = null }
+  socialCalendarDetail.value = null
+  if (!newId) return
+  socialCalendarDetailLoading.value = true
+  try {
+    const client = getConvexClient()
+    socialCalendarDetailUnsub = client.onUpdate('socialCalendar/queries:getById' as any, { calendarId: newId }, (data: any) => {
+      socialCalendarDetail.value = data
+      socialCalendarDetailLoading.value = false
+    })
+  } catch (err) {
+    console.error('Failed to load social media calendar:', err)
+    socialCalendarDetailLoading.value = false
+  }
+}, { immediate: true })
+
+async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost' | 'socialMediaCalendar', id: string) {
   if (!confirm('Delete this item? This cannot be undone.')) return
   deletingId.value = id
   try {
@@ -437,6 +470,9 @@ async function handleDelete(type: 'series' | 'research' | 'brainstorm' | 'agenda
     } else if (type === 'churchSocialPost') {
       await client.mutation('churchSocial/mutations:remove' as any, { postId: id })
       if (selectedChurchSocialId.value === id) router.push('/notebook')
+    } else if (type === 'socialMediaCalendar') {
+      await client.mutation('socialCalendar/mutations:remove' as any, { calendarId: id })
+      if (selectedCalendarId.value === id) router.push('/notebook')
     } else {
       await client.mutation('research/mutations:remove' as any, { noteId: id })
       if (selectedResearchId.value === id) router.push('/notebook')
@@ -501,6 +537,7 @@ function getTypeBadge(type: string): { label: string; color: string } {
     case 'youtube': return { label: 'YouTube', color: 'bg-red-500/10 text-red-600' }
     case 'smallGroupQuestions': return { label: 'Small Group', color: 'bg-teal-500/10 text-teal-700' }
     case 'churchSocialPost': return { label: 'Church Social', color: 'bg-pink-500/10 text-pink-700' }
+    case 'socialMediaCalendar': return { label: 'Social Calendar', color: 'bg-indigo-500/10 text-indigo-700' }
     default: return { label: type, color: 'bg-muted text-muted-foreground' }
   }
 }
@@ -514,7 +551,7 @@ function getSeriesName(seriesId: string | undefined): string {
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
-    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost'
+    type: 'sermon' | 'series' | 'research' | 'brainstorm' | 'agenda' | 'devotional' | 'blog' | 'youtube' | 'smallGroupQuestions' | 'churchSocialPost' | 'socialMediaCalendar'
     id: string
     title: string
     subtitle: string
@@ -532,6 +569,7 @@ const combinedList = computed(() => {
     ...youtubeList.value.map(y => ({ type: 'youtube' as const, id: y._id, title: y.title, subtitle: '', date: y.createdAt || 0, status: y.status || 'draft', tab: 'content' as const })),
     ...smallGroupList.value.map(g => ({ type: 'smallGroupQuestions' as const, id: g._id, title: g.title || 'Small Group Questions', subtitle: '', date: g.createdAt || 0, status: g.status || 'draft', tab: 'content' as const })),
     ...churchSocialList.value.map(p => ({ type: 'churchSocialPost' as const, id: p._id, title: p.title || 'Church Social Post', subtitle: '', date: p.createdAt || 0, status: p.status || 'draft', tab: 'content' as const })),
+    ...socialCalendarList.value.map(c => ({ type: 'socialMediaCalendar' as const, id: c._id, title: c.title || 'Social Media Calendar', subtitle: '', date: c.createdAt || 0, status: c.status || 'draft', tab: 'content' as const })),
   ]
   return items.sort((a, b) => b.date - a.date)
 })
@@ -585,6 +623,7 @@ const filteredList = computed(() => {
             <template v-else-if="view === 'youtube'">YouTube package</template>
             <template v-else-if="view === 'smallGroup'">Small Group Questions</template>
             <template v-else-if="view === 'churchSocial'">Church Social Post</template>
+            <template v-else-if="view === 'socialCalendar'">Social Media Calendar</template>
             <template v-else>Your saved work, organized by purpose</template>
           </p>
         </div>
@@ -781,7 +820,8 @@ const filteredList = computed(() => {
               : item.type === 'blog' ? `/notebook/blog/${item.id}`
               : item.type === 'youtube' ? `/notebook/youtube/${item.id}`
               : item.type === 'smallGroupQuestions' ? `/notebook/small-group/${item.id}`
-              : `/notebook/church-social/${item.id}`
+              : item.type === 'churchSocialPost' ? `/notebook/church-social/${item.id}`
+              : `/notebook/social-calendar/${item.id}`
             )"
             class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
           >
@@ -795,6 +835,7 @@ const filteredList = computed(() => {
                 <Video v-else-if="item.type === 'youtube'" class="h-5 w-5" />
                 <BookOpen v-else-if="item.type === 'smallGroupQuestions'" class="h-5 w-5" />
                 <svg v-else-if="item.type === 'churchSocialPost'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6.1H3"/><path d="M21 12.1H3"/><path d="M15.1 18H3"/></svg>
+                <CalendarDays v-else-if="item.type === 'socialMediaCalendar'" class="h-5 w-5" />
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
@@ -1352,6 +1393,54 @@ const filteredList = computed(() => {
           <div class="text-center space-y-1">
             <h3 class="text-lg font-semibold text-foreground">Church Social Post not found</h3>
             <p class="text-sm text-muted-foreground">This post may have been deleted.</p>
+          </div>
+          <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Social Media Calendar Detail View -->
+    <div v-else-if="view === 'socialCalendar'" class="flex-1 overflow-y-auto">
+      <div class="max-w-4xl mx-auto px-6 py-6">
+        <div v-if="socialCalendarDetailLoading" class="flex items-center justify-center py-12">
+          <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+
+        <div v-else-if="socialCalendarDetail" class="space-y-6">
+          <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ socialCalendarDetail.title }}</h2>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">Social Calendar</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="handleDelete('socialMediaCalendar', socialCalendarDetail._id)"
+                :disabled="deletingId === socialCalendarDetail._id"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 class="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div v-if="socialCalendarDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground">
+            <div v-html="marked.parse(socialCalendarDetail.content)" />
+          </div>
+
+          <div class="flex items-center gap-4 text-xs text-muted-foreground pt-4 border-t border-border">
+            <span v-if="socialCalendarDetail.createdAt">Created {{ formatDate(socialCalendarDetail.createdAt) }}</span>
+            <span v-if="socialCalendarDetail.updatedAt && socialCalendarDetail.updatedAt !== socialCalendarDetail.createdAt">Updated {{ formatDate(socialCalendarDetail.updatedAt) }}</span>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col items-center justify-center py-20 space-y-4">
+          <div class="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center"><CalendarDays class="h-8 w-8 text-muted-foreground" /></div>
+          <div class="text-center space-y-1">
+            <h3 class="text-lg font-semibold text-foreground">Social Media Calendar not found</h3>
+            <p class="text-sm text-muted-foreground">This calendar may have been deleted.</p>
           </div>
           <button @click="router.push('/notebook')" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">Back to Notebook</button>
         </div>
