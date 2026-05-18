@@ -29,7 +29,6 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const hideSidebar = computed(() => route.meta.hideSidebar === true)
-const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
 
 async function handleSignOut() {
   await auth.signOut()
@@ -173,9 +172,6 @@ function navigateTo(path: string) {
 
       <div class="px-3 pb-3 pt-2 space-y-1">
         <div class="mx-3 h-px bg-border mb-2" />
-        <div class="mx-1 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-          Credits: <span class="font-semibold">{{ creditBalance }}</span>
-        </div>
         <button
           @click="navigateTo('/settings')"
           :class="[
