@@ -16,6 +16,7 @@ import { useSaveYoutube } from '@/composables/useSaveYoutube'
 import { useSaveSmallGroup } from '@/composables/useSaveSmallGroup'
 import { useSaveChurchSocial } from '@/composables/useSaveChurchSocial'
 import { useSaveSocialCalendar } from '@/composables/useSaveSocialCalendar'
+import { useSaveChurchEmail } from '@/composables/useSaveChurchEmail'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
@@ -26,6 +27,7 @@ import SaveYoutubeModal from '@/components/SaveYoutubeModal.vue'
 import SaveSmallGroupModal from '@/components/SaveSmallGroupModal.vue'
 import SaveChurchSocialModal from '@/components/SaveChurchSocialModal.vue'
 import SaveSocialCalendarModal from '@/components/SaveSocialCalendarModal.vue'
+import SaveChurchEmailModal from '@/components/SaveChurchEmailModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -126,8 +128,9 @@ const isSermonToYoutube = props.skillSlug === 'sermon-to-youtube'
 const isSmallGroupQuestions = props.skillSlug === 'small-group-questions'
 const isChurchSocialPost = props.skillSlug === 'church-social-post'
 const isSocialMediaCalendar = props.skillSlug === 'social-media-calendar'
+const isChurchEmail = props.skillSlug === 'church-email'
 const isIntakePhase = ref(true)
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost || isSocialMediaCalendar
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost || isSocialMediaCalendar || isChurchEmail
 
 // Series save flow
 const {
@@ -238,6 +241,17 @@ const {
   save: confirmSaveSocialCalendar,
   reset: resetSocialCalendarSave,
 } = useSaveSocialCalendar()
+
+// Church email save flow
+const {
+  status: churchEmailSaveStatus,
+  preview: churchEmailPreview,
+  error: churchEmailSaveError,
+  savedEmailId,
+  extract: extractChurchEmail,
+  save: confirmSaveChurchEmail,
+  reset: resetChurchEmailSave,
+} = useSaveChurchEmail()
 
 const showSaveModal = ref(false)
 
@@ -386,6 +400,7 @@ const canSave = computed(() => {
     : isSmallGroupQuestions ? smallGroupSaveStatus.value
     : isChurchSocialPost ? churchSocialSaveStatus.value
     : isSocialMediaCalendar ? socialCalendarSaveStatus.value
+    : isChurchEmail ? churchEmailSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
@@ -393,7 +408,7 @@ const canSave = computed(() => {
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
   // Blog/YouTube should generally appear near the end of staged output.
-  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : (isChurchSocialPost || isSocialMediaCalendar) ? 3 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
+  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : (isChurchSocialPost || isSocialMediaCalendar || isChurchEmail) ? 3 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -704,6 +719,7 @@ async function handleSaveClick() {
   if (isSmallGroupQuestions) resetSmallGroupSave()
   if (isChurchSocialPost) resetChurchSocialSave()
   if (isSocialMediaCalendar) resetSocialCalendarSave()
+  if (isChurchEmail) resetChurchEmailSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -731,6 +747,8 @@ async function handleSaveClick() {
     await extractChurchSocial(extractionMessages as any)
   } else if (isSocialMediaCalendar) {
     await extractSocialCalendar(extractionMessages as any)
+  } else if (isChurchEmail) {
+    await extractChurchEmail(extractionMessages as any)
   }
 }
 
@@ -774,6 +792,10 @@ function handleSaveConfirmSocialCalendar(data: any) {
   confirmSaveSocialCalendar(data)
 }
 
+function handleSaveConfirmChurchEmail(data: any) {
+  confirmSaveChurchEmail(data)
+}
+
 function handleSaveModalClose() {
   showSaveModal.value = false
   if (isSeriesPlanner && seriesSaveStatus.value === 'saved' && savedSeriesId.value) {
@@ -815,6 +837,10 @@ function handleSaveModalClose() {
     const calendarId = savedCalendarId.value
     resetSocialCalendarSave()
     router.push(`/notebook/social-calendar/${calendarId}`)
+  } else if (isChurchEmail && churchEmailSaveStatus.value === 'saved' && savedEmailId.value) {
+    const emailId = savedEmailId.value
+    resetChurchEmailSave()
+    router.push(`/notebook/church-email/${emailId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -845,6 +871,9 @@ function handleSaveModalClose() {
   } else if (socialCalendarSaveStatus.value === 'saved') {
     resetSocialCalendarSave()
     router.push('/notebook?tab=content&filter=socialMediaCalendar')
+  } else if (churchEmailSaveStatus.value === 'saved') {
+    resetChurchEmailSave()
+    router.push('/notebook?tab=content&filter=churchEmail')
   }
 }
 </script>
@@ -1185,6 +1214,18 @@ function handleSaveModalClose() {
       :is-saving="socialCalendarSaveStatus === 'saving'"
       :saved-id="savedCalendarId"
       @save="handleSaveConfirmSocialCalendar"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveChurchEmailModal
+      v-if="showSaveModal && isChurchEmail"
+      :save-status="churchEmailSaveStatus"
+      :preview="churchEmailPreview"
+      :save-error="churchEmailSaveError"
+      :is-saving="churchEmailSaveStatus === 'saving'"
+      :saved-id="savedEmailId"
+      @save="handleSaveConfirmChurchEmail"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />
