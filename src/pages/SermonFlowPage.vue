@@ -65,11 +65,65 @@ const { mutate: updateSermon, isLoading: updateSaving } = useConvexMutation('ser
 const isSaving = computed(() => createSaving.value || updateSaving.value)
 
 const editor = useEditor({
-  extensions: [StarterKit, Highlight.configure({ multicolor: true })],
+  extensions: [
+    StarterKit.configure({
+      bulletList: {
+        HTMLAttributes: { class: '' },
+      },
+    }),
+    Highlight.configure({ multicolor: true }),
+  ],
   content: '',
   editorProps: {
     attributes: {
       class: 'sermon-editor prose prose-slate max-w-none min-h-[calc(100vh-250px)] px-5 py-4 focus:outline-none',
+    },
+    handleKeyDown: (_view, event) => {
+      // Fix bullet-list Enter behaviour:
+      // - Enter on non-empty bullet → create a new sibling bullet (not a paragraph inside the bullet)
+      // - Enter on an empty bullet     → lift out of the list back to a paragraph
+      if (event.key === 'Enter' && !event.shiftKey) {
+        const editorInstance = editor?.value
+        if (!editorInstance) return false
+
+        const { state } = editorInstance
+        const { selection } = state
+        const { $from } = selection
+
+        // Walk up from cursor to find a bulletList ancestor
+        let bulletDepth = -1
+        let listItemDepth = -1
+
+        for (let d = $from.depth; d >= 0; d--) {
+          const node = $from.node(d)
+          if (node.type.name === 'bulletList') {
+            bulletDepth = d
+            break
+          }
+          if (node.type.name === 'listItem') {
+            listItemDepth = d
+          }
+        }
+
+        if (bulletDepth >= 0 && listItemDepth >= 0) {
+          const listItemNode = $from.node(listItemDepth)
+
+          // Empty bullet (only whitespace) → exit the list
+          if (listItemNode.textContent.trim() === '') {
+            editorInstance.commands.liftListItem('listItem')
+            return true
+          }
+
+          // Non-empty bullet → split into new list-item (default behaviour, but we enforce it)
+          editorInstance.chain().splitListItem('listItem').run()
+          return true
+        }
+
+        // Not in a bullet list — keep default Enter handling
+        return false
+      }
+
+      return false
     },
   },
   onUpdate: ({ editor }) => {
