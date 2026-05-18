@@ -65,6 +65,11 @@ const routes = [
         component: () => import('@/pages/NotebookPage.vue'),
       },
       {
+        path: 'notebook/church-social/:churchSocialId',
+        name: 'notebook-church-social-detail',
+        component: () => import('@/pages/NotebookPage.vue'),
+      },
+      {
         path: 'notebook/:id',
         name: 'notebook-detail',
         component: () => import('@/pages/NotebookPage.vue'),

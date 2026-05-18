@@ -14,6 +14,7 @@ import { useSaveDevotional } from '@/composables/useSaveDevotional'
 import { useSaveBlog } from '@/composables/useSaveBlog'
 import { useSaveYoutube } from '@/composables/useSaveYoutube'
 import { useSaveSmallGroup } from '@/composables/useSaveSmallGroup'
+import { useSaveChurchSocial } from '@/composables/useSaveChurchSocial'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
@@ -22,6 +23,7 @@ import SaveDevotionalModal from '@/components/SaveDevotionalModal.vue'
 import SaveBlogModal from '@/components/SaveBlogModal.vue'
 import SaveYoutubeModal from '@/components/SaveYoutubeModal.vue'
 import SaveSmallGroupModal from '@/components/SaveSmallGroupModal.vue'
+import SaveChurchSocialModal from '@/components/SaveChurchSocialModal.vue'
 
 const INTAKE_PROMPT_BASE = `You are a conversational intake assistant for the Sermon Research skill.
 
@@ -120,8 +122,9 @@ const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
 const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
 const isSermonToYoutube = props.skillSlug === 'sermon-to-youtube'
 const isSmallGroupQuestions = props.skillSlug === 'small-group-questions'
+const isChurchSocialPost = props.skillSlug === 'church-social-post'
 const isIntakePhase = ref(true)
-const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions
+const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost
 
 // Series save flow
 const {
@@ -210,6 +213,17 @@ const {
   save: confirmSaveSmallGroup,
   reset: resetSmallGroupSave,
 } = useSaveSmallGroup()
+
+// Church social post save flow
+const {
+  status: churchSocialSaveStatus,
+  preview: churchSocialPreview,
+  error: churchSocialSaveError,
+  savedPostId,
+  extract: extractChurchSocial,
+  save: confirmSaveChurchSocial,
+  reset: resetChurchSocialSave,
+} = useSaveChurchSocial()
 
 const showSaveModal = ref(false)
 
@@ -356,6 +370,7 @@ const canSave = computed(() => {
     : isSermonToBlog ? blogSaveStatus.value
     : isSermonToYoutube ? youtubeSaveStatus.value
     : isSmallGroupQuestions ? smallGroupSaveStatus.value
+    : isChurchSocialPost ? churchSocialSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
@@ -363,7 +378,7 @@ const canSave = computed(() => {
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
   // Blog/YouTube should generally appear near the end of staged output.
-  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
+  const threshold = isSeriesPlanner ? 6 : isSmallGroupQuestions ? 2 : isChurchSocialPost ? 3 : (isSermonToBlog || isSermonToYoutube) ? 4 : (isMeetingAgenda || isMidweekDevotional) ? 3 : 2
   return assistantMsgs >= threshold
 })
 
@@ -639,6 +654,7 @@ async function handleSaveClick() {
   if (isSermonToBlog) resetBlogSave()
   if (isSermonToYoutube) resetYoutubeSave()
   if (isSmallGroupQuestions) resetSmallGroupSave()
+  if (isChurchSocialPost) resetChurchSocialSave()
 
   const extractionMessages: ChatMessage[] = messages.value
     .filter(m => m.role !== 'system')
@@ -662,6 +678,8 @@ async function handleSaveClick() {
     await extractYoutube(extractionMessages as any, selectedBlogId.value)
   } else if (isSmallGroupQuestions) {
     await extractSmallGroup(extractionMessages as any, selectedSermonId.value)
+  } else if (isChurchSocialPost) {
+    await extractChurchSocial(extractionMessages as any)
   }
 }
 
@@ -697,6 +715,10 @@ function handleSaveConfirmSmallGroup(data: any) {
   confirmSaveSmallGroup(data)
 }
 
+function handleSaveConfirmChurchSocial(data: any) {
+  confirmSaveChurchSocial(data)
+}
+
 function handleSaveModalClose() {
   showSaveModal.value = false
   if (isSeriesPlanner && seriesSaveStatus.value === 'saved' && savedSeriesId.value) {
@@ -730,6 +752,10 @@ function handleSaveModalClose() {
   } else if (isSmallGroupQuestions && smallGroupSaveStatus.value === 'saved' && savedGuideId.value) {
     resetSmallGroupSave()
     router.push('/notebook?tab=content&filter=smallGroupQuestions')
+  } else if (isChurchSocialPost && churchSocialSaveStatus.value === 'saved' && savedPostId.value) {
+    const postId = savedPostId.value
+    resetChurchSocialSave()
+    router.push(`/notebook/church-social/${postId}`)
   } else if (seriesSaveStatus.value === 'saved') {
     resetSeriesSave()
     router.push('/notebook')
@@ -754,6 +780,9 @@ function handleSaveModalClose() {
   } else if (smallGroupSaveStatus.value === 'saved') {
     resetSmallGroupSave()
     router.push('/notebook?tab=content&filter=smallGroupQuestions')
+  } else if (churchSocialSaveStatus.value === 'saved') {
+    resetChurchSocialSave()
+    router.push('/notebook?tab=content&filter=churchSocialPost')
   }
 }
 </script>
@@ -1070,6 +1099,18 @@ function handleSaveModalClose() {
       :is-saving="smallGroupSaveStatus === 'saving'"
       :saved-id="savedGuideId"
       @save="handleSaveConfirmSmallGroup"
+      @close="handleSaveModalClose"
+      @retry="handleSaveClick"
+    />
+
+    <SaveChurchSocialModal
+      v-if="showSaveModal && isChurchSocialPost"
+      :save-status="churchSocialSaveStatus"
+      :preview="churchSocialPreview"
+      :save-error="churchSocialSaveError"
+      :is-saving="churchSocialSaveStatus === 'saving'"
+      :saved-id="savedPostId"
+      @save="handleSaveConfirmChurchSocial"
       @close="handleSaveModalClose"
       @retry="handleSaveClick"
     />

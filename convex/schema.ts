@@ -180,6 +180,17 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_sermon", ["sermonId"]),
 
+  // Church social posts — saved from the Church Social Post skill
+  churchSocialPosts: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    content: v.optional(v.string()),
+    status: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
   agentWorkflows: defineTable({
     userId: v.id("users"),
     sermonId: v.optional(v.id("sermons")),
