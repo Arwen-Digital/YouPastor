@@ -498,6 +498,30 @@ Blog content:
 ${blogContent}`
 }
 
+function looksLikeFinalSocialDeliverable(content: string): boolean {
+  const text = content.toLowerCase()
+
+  // Church Social Post final sections
+  const hasSocialSections =
+    text.includes('### facebook') ||
+    text.includes('### instagram') ||
+    text.includes('### twitter') ||
+    text.includes('twitter/x') ||
+    text.includes('**selected post type:**') ||
+    text.includes('image suggestions') ||
+    text.includes('posting tip') ||
+    text.includes('why this works')
+
+  // Social Media Calendar common structure hints
+  const hasCalendarSections =
+    text.includes('social media calendar') ||
+    text.includes('week 1') ||
+    text.includes('| monday') ||
+    text.includes('monday |')
+
+  return content.length > 700 && (hasSocialSections || hasCalendarSections)
+}
+
 async function handleAssistantResponse(responseContent: string) {
   messages.value.push({ role: 'assistant', content: responseContent })
 
@@ -519,6 +543,15 @@ async function handleAssistantResponse(responseContent: string) {
   // Generic intake handoff: final generation uses generator for all remaining skills.
   if (!isSermonResearch && !isSermonBrainstorm && !isSermonToYoutube && !isSmallGroupQuestions && isIntakePhase.value && responseContent.includes('SKILL_READY:')) {
     await handoffToGenerator()
+    return
+  }
+
+  // Fallback: if model skips SKILL_READY but clearly outputs final social deliverable,
+  // unlock save by ending intake phase without forcing another generation turn.
+  if ((isChurchSocialPost || isSocialMediaCalendar) && isIntakePhase.value && looksLikeFinalSocialDeliverable(responseContent)) {
+    isIntakePhase.value = false
+    setRole('generator')
+    currentSystemPrompt.value = baseSystemPrompt.value
   }
 }
 
