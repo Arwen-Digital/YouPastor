@@ -135,6 +135,11 @@ const routes = [
         name: 'settings',
         component: () => import('@/pages/SettingsPage.vue'),
       },
+      {
+        path: 'upgrade',
+        name: 'upgrade',
+        component: () => import('@/pages/UpgradePage.vue'),
+      },
     ],
   },
   {

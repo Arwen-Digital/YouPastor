@@ -29,6 +29,13 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const hideSidebar = computed(() => route.meta.hideSidebar === true)
+const LOW_CREDIT_THRESHOLD = 20
+const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
+const showLowCreditNotice = computed(() => creditBalance.value <= LOW_CREDIT_THRESHOLD)
+const lowCreditProgress = computed(() => {
+  const pct = (creditBalance.value / LOW_CREDIT_THRESHOLD) * 100
+  return Math.max(0, Math.min(100, pct))
+})
 
 async function handleSignOut() {
   await auth.signOut()
@@ -172,6 +179,28 @@ function navigateTo(path: string) {
 
       <div class="px-3 pb-3 pt-2 space-y-1">
         <div class="mx-3 h-px bg-border mb-2" />
+
+        <div v-if="showLowCreditNotice" class="mx-1 mb-2 rounded-2xl border border-border bg-card p-3 shadow-sm space-y-2">
+          <div class="text-sm font-medium text-foreground">{{ creditBalance }} credits remaining</div>
+          <p class="text-xs text-muted-foreground">Top up to keep generating content without interruption.</p>
+          <div class="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div class="h-full bg-foreground/80" :style="{ width: `${lowCreditProgress}%` }" />
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button
+              @click="navigateTo('/upgrade')"
+              class="rounded-full border border-border px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              Add credits
+            </button>
+            <button
+              @click="navigateTo('/upgrade')"
+              class="rounded-full bg-foreground px-2 py-1.5 text-xs font-medium text-background hover:opacity-90 transition-opacity"
+            >
+              Upgrade
+            </button>
+          </div>
+        </div>
         <button
           @click="navigateTo('/settings')"
           :class="[
@@ -185,7 +214,7 @@ function navigateTo(path: string) {
           Settings
         </button>
         <button
-          @click="navigateTo('/settings')"
+          @click="navigateTo('/upgrade')"
           class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
         >
           <Zap class="h-4 w-4" />
