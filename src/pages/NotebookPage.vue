@@ -659,6 +659,40 @@ function getSeriesName(seriesId: string | undefined): string {
   return s?.title ?? ''
 }
 
+function openWeekInBrainstorm(week: any) {
+  if (!seriesDetail.value?.series) return
+  router.push({
+    name: 'brainstorm',
+    query: {
+      fromNotebook: '1',
+      seriesId: String(seriesDetail.value.series._id ?? ''),
+      seriesTitle: String(seriesDetail.value.series.title ?? ''),
+      weekNumber: String(week.weekNumber ?? ''),
+      sermonTitle: String(week.sermonTitle ?? ''),
+      scriptureRef: String(week.scriptureRef ?? ''),
+      bigIdea: String(week.bigIdea ?? ''),
+      connectiveThread: String(week.connectiveThread ?? ''),
+    },
+  })
+}
+
+function openWeekInResearch(week: any) {
+  if (!seriesDetail.value?.series) return
+  router.push({
+    name: 'research',
+    query: {
+      fromNotebook: '1',
+      seriesId: String(seriesDetail.value.series._id ?? ''),
+      seriesTitle: String(seriesDetail.value.series.title ?? ''),
+      weekNumber: String(week.weekNumber ?? ''),
+      sermonTitle: String(week.sermonTitle ?? ''),
+      scriptureRef: String(week.scriptureRef ?? ''),
+      bigIdea: String(week.bigIdea ?? ''),
+      connectiveThread: String(week.connectiveThread ?? ''),
+    },
+  })
+}
+
 // Combined list for ordering by date
 const combinedList = computed(() => {
   const items: Array<{
@@ -1049,9 +1083,25 @@ const filteredList = computed(() => {
             <h3 class="text-sm font-medium text-foreground">Weekly Breakdown <span class="text-muted-foreground font-normal">({{ seriesDetail.weeks.length }} weeks)</span></h3>
             <div class="space-y-2">
               <div v-for="week in seriesDetail.weeks" :key="week._id" class="rounded-lg border border-border bg-card p-4 space-y-2">
-                <div class="flex items-center gap-2">
-                  <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-xs font-semibold text-primary">{{ week.weekNumber }}</span>
-                  <h4 class="text-sm font-semibold text-foreground">{{ week.sermonTitle || 'Untitled' }}</h4>
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-xs font-semibold text-primary">{{ week.weekNumber }}</span>
+                    <h4 class="text-sm font-semibold text-foreground truncate">{{ week.sermonTitle || 'Untitled' }}</h4>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      @click="openWeekInBrainstorm(week)"
+                      class="inline-flex items-center rounded-md border border-amber-300/60 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                    >
+                      Brainstorm
+                    </button>
+                    <button
+                      @click="openWeekInResearch(week)"
+                      class="inline-flex items-center rounded-md border border-blue-300/60 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                    >
+                      Research
+                    </button>
+                  </div>
                 </div>
                 <div v-if="week.scriptureRef" class="text-sm text-muted-foreground"><span class="font-medium text-foreground/70">Scripture:</span> {{ week.scriptureRef }}</div>
                 <div v-if="week.bigIdea" class="text-sm text-muted-foreground"><span class="font-medium text-foreground/70">Big Idea:</span> {{ week.bigIdea }}</div>
