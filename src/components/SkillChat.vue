@@ -404,7 +404,13 @@ watch(genericIntakePrompt, (newPrompt) => {
 const canSave = computed(() => {
   if (!canShowSave) return false
   if (isLoading.value) return false
-  if (isIntakePhase.value) return false
+
+  const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
+  const isGenericContentSkill = isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript
+  // Hard fallback so Save can't get stuck inactive if model never emits SKILL_READY.
+  const intakeBypass = isGenericContentSkill && assistantMsgs >= 4
+  if (isIntakePhase.value && !intakeBypass) return false
+
   const status = isSeriesPlanner ? seriesSaveStatus.value
     : isSermonBrainstorm ? brainstormSaveStatus.value
     : isMeetingAgenda ? agendaSaveStatus.value
@@ -418,7 +424,7 @@ const canSave = computed(() => {
     : isAnnouncementScript ? announcementSaveStatus.value
     : researchSaveStatus.value
   if (status !== 'idle' && status !== 'error') return false
-  const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
+
   // Series planner needs more back-and-forth (6 msgs)
   // Meeting agenda needs at least 3 (assessment + agenda + tips)
   // Devotional needs at least 3 (direction + devotional + polish)
@@ -595,12 +601,23 @@ async function handleAssistantResponse(responseContent: string) {
     return
   }
 
-  // Fallback: if model skips SKILL_READY but clearly outputs final social deliverable,
+  // Fallback: if model skips SKILL_READY but clearly outputs final deliverable,
   // unlock save by ending intake phase without forcing another generation turn.
   if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript) && isIntakePhase.value && looksLikeFinalSocialDeliverable(responseContent)) {
     isIntakePhase.value = false
     setRole('generator')
     currentSystemPrompt.value = baseSystemPrompt.value
+    return
+  }
+
+  // Safety fallback: after enough assistant turns, don't block Save behind intake state.
+  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript) && isIntakePhase.value) {
+    const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
+    if (assistantMsgs >= 4) {
+      isIntakePhase.value = false
+      setRole('generator')
+      currentSystemPrompt.value = baseSystemPrompt.value
+    }
   }
 }
 
