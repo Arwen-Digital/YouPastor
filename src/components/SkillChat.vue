@@ -515,6 +515,7 @@ function scrollToBottom() {
 
 watch(streamingContent, () => scrollToBottom())
 watch(isLoading, (loading) => { if (loading) scrollToBottom() })
+watch(() => messages.value.length, () => scrollToBottom())
 
 const showSourceChooser = computed(() => (isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions) && !hasStartedConversation.value)
 
@@ -830,6 +831,8 @@ async function handleSend() {
   if (streamingContent.value) {
     await handleAssistantResponse(streamingContent.value)
   }
+
+  scrollToBottom()
 }
 
 async function handleSaveClick() {
