@@ -176,7 +176,7 @@ function switchMode(newMode: 'signin' | 'signup') {
           <p class="text-sm text-muted-foreground">
             {{ mode === 'signin'
               ? 'Sign in to continue your work'
-              : 'Start your free trial — 100 credits included'
+              : 'Start your free trial — 50 credits included'
             }}
           </p>
         </div>

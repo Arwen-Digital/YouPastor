@@ -3,22 +3,41 @@ export interface Message {
   content: string
 }
 
+export type AIRole = 'orchestrator' | 'generator' | 'researcher'
+
+export type AIOperation =
+  | 'orchestrator_intake'
+  | 'sermon_research'
+  | 'sermon_brainstorm'
+  | 'series_plan'
+  | 'sermon_to_blog'
+  | 'sermon_to_youtube'
+  | 'small_group_questions'
+  | 'church_social_post'
+  | 'social_media_calendar'
+  | 'church_email'
+  | 'announcement_script'
+  | 'church_letter'
+  | 'meeting_agenda'
+  | 'midweek_devotional'
+  | 'save_extraction'
+
 export interface ChatCompletionOptions {
   messages: Message[]
   temperature?: number
   maxTokens?: number
   stream?: boolean
+  operation?: AIOperation
+  skillSlug?: string
 }
 
 export interface ChatCompletionResult {
   content: string
   citations?: string[]
-  usage?: {
-    promptTokens: number
-    completionTokens: number
-    totalTokens: number
-  }
   model: string
+  creditsCharged?: number
+  remainingCredits?: number
+  providerCostUsdMicros?: number
 }
 
 export interface StreamingChunk {
@@ -27,8 +46,6 @@ export interface StreamingChunk {
 }
 
 export type StreamingCallback = (chunk: StreamingChunk) => void
-
-export type AIRole = 'orchestrator' | 'generator' | 'researcher'
 
 export interface AIProvider {
   readonly name: string

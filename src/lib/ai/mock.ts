@@ -23,7 +23,6 @@ export class MockProvider implements AIProvider {
 
     return {
       content: `[Mock response] You asked: "${this.getLastUserMessage(options.messages)}"\n\nThis is a simulated response for UI development. In production, this will be replaced with a real AI model response.`,
-      usage: { promptTokens: 10, completionTokens: 30, totalTokens: 40 },
       model: this.model,
     }
   }

@@ -19,6 +19,7 @@ import { useSaveSocialCalendar } from '@/composables/useSaveSocialCalendar'
 import { useSaveChurchEmail } from '@/composables/useSaveChurchEmail'
 import { useSaveAnnouncement } from '@/composables/useSaveAnnouncement'
 import { useSaveChurchLetter } from '@/composables/useSaveChurchLetter'
+import type { AIOperation } from '@/lib/ai/types'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
@@ -137,6 +138,30 @@ const isAnnouncementScript = props.skillSlug === 'announcement-script'
 const isChurchLetter = props.skillSlug === 'church-letter'
 const isIntakePhase = ref(true)
 const canShowSave = isSeriesPlanner || isSermonResearch || isSermonBrainstorm || isMeetingAgenda || isMidweekDevotional || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter
+
+function getSkillOperation(): AIOperation {
+  if (isSeriesPlanner) return 'series_plan'
+  if (isSermonResearch) return 'sermon_research'
+  if (isSermonBrainstorm) return 'sermon_brainstorm'
+  if (isMeetingAgenda) return 'meeting_agenda'
+  if (isMidweekDevotional) return 'midweek_devotional'
+  if (isSermonToBlog) return 'sermon_to_blog'
+  if (isSermonToYoutube) return 'sermon_to_youtube'
+  if (isSmallGroupQuestions) return 'small_group_questions'
+  if (isChurchSocialPost) return 'church_social_post'
+  if (isSocialMediaCalendar) return 'social_media_calendar'
+  if (isChurchEmail) return 'church_email'
+  if (isAnnouncementScript) return 'announcement_script'
+  if (isChurchLetter) return 'church_letter'
+  return 'orchestrator_intake'
+}
+
+function getCurrentChatOperation(): AIOperation {
+  if (isIntakePhase.value) return 'orchestrator_intake'
+  if (isSermonResearch) return 'sermon_research'
+  if (isSermonBrainstorm) return 'sermon_brainstorm'
+  return getSkillOperation()
+}
 
 // Series save flow
 const {
@@ -651,7 +676,10 @@ async function startConversation(userMessage: string) {
   messages.value.push({ role: 'user', content: userMessage })
   scrollToBottom()
 
-  const result = await sendMessage(buildChatHistory() as any)
+  const result = await sendMessage(buildChatHistory() as any, {
+    operation: 'orchestrator_intake',
+    skillSlug: props.skillSlug,
+  })
 
   if (result) {
     await handleAssistantResponse(result.content)
@@ -696,7 +724,10 @@ async function handoffToResearcher() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any)
+  await streamMessage(buildChatHistory() as any, {
+    operation: 'sermon_research',
+    skillSlug: props.skillSlug,
+  })
 
   if (streamingContent.value) {
     messages.value.push({ role: 'assistant', content: streamingContent.value })
@@ -716,7 +747,10 @@ async function handoffToBriefGenerator() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any)
+  await streamMessage(buildChatHistory() as any, {
+    operation: 'sermon_brainstorm',
+    skillSlug: props.skillSlug,
+  })
 
   if (streamingContent.value) {
     messages.value.push({ role: 'assistant', content: streamingContent.value })
@@ -735,7 +769,10 @@ async function handoffToYoutubePackager() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any)
+  await streamMessage(buildChatHistory() as any, {
+    operation: 'sermon_to_youtube',
+    skillSlug: props.skillSlug,
+  })
 
   if (streamingContent.value) {
     messages.value.push({ role: 'assistant', content: streamingContent.value })
@@ -754,7 +791,10 @@ async function handoffToGenerator() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any)
+  await streamMessage(buildChatHistory() as any, {
+    operation: getSkillOperation(),
+    skillSlug: props.skillSlug,
+  })
 
   if (streamingContent.value) {
     messages.value.push({ role: 'assistant', content: streamingContent.value })
@@ -772,7 +812,10 @@ async function handleSend() {
   messages.value.push({ role: 'user', content: text })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any)
+  await streamMessage(buildChatHistory() as any, {
+    operation: getCurrentChatOperation(),
+    skillSlug: props.skillSlug,
+  })
 
   if (streamingContent.value) {
     await handleAssistantResponse(streamingContent.value)

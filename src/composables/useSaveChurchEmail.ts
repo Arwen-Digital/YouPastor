@@ -42,7 +42,7 @@ Rules:
 Conversation:
 ${messages.filter(m => m.role !== 'system').map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n')}`
 
-      const response = await sendMessage([{ role: 'user', content: prompt }])
+      const response = await sendMessage([{ role: 'user', content: prompt }], { operation: 'save_extraction', skillSlug: 'church-email' })
       if (!response?.content) throw new Error('Extraction failed to return a response.')
 
       let cleanJson = response.content.trim()

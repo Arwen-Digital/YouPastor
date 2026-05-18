@@ -1,11 +1,13 @@
 import { ref, type Ref } from 'vue'
 import type {
   AIRole,
+  AIOperation,
   ChatCompletionOptions,
   ChatCompletionResult,
   Message,
 } from '@/lib/ai/types'
 import { getProviderForRole } from '@/lib/ai/factory'
+import { getConvexClient } from '@/lib/convex'
 
 export function useAI(initialRole: AIRole = 'orchestrator') {
   const isLoading = ref(false)
@@ -13,18 +15,17 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
   const streamingContent = ref('')
   const citations = ref<string[]>([])
 
-  // Dynamic role: allows switching mid-conversation (e.g., orchestrator → researcher)
   const role = ref<AIRole>(initialRole)
 
-  /**
-   * Switch to a different model role for subsequent calls.
-   * E.g. call setRole('researcher') after orchestrator finishes its output.
-   */
   function setRole(newRole: AIRole) {
     if (role.value !== newRole) {
       role.value = newRole
       console.log('[useAI] Role switched to:', newRole)
     }
+  }
+
+  function resolveOperation(options?: Omit<ChatCompletionOptions, 'messages'>): AIOperation {
+    return (options?.operation ?? 'orchestrator_intake') as AIOperation
   }
 
   async function sendMessage(
@@ -36,12 +37,48 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
     try {
       const provider = getProviderForRole(role.value)
       console.log('[useAI] Using provider:', provider.name, 'model:', provider.model)
-      const result = await provider.chat({ messages, ...options })
-      console.log('[useAI] Result → content length:', result.content.length, 'model:', result.model, 'citations:', result.citations?.length ?? 0)
-      if (!result.content.trim()) {
-        throw new Error('AI returned an empty response. The model may be overloaded or unavailable. Try again or switch models in Settings.')
+
+      let result: ChatCompletionResult
+
+      if (provider.name === 'OpenRouter') {
+        const client = getConvexClient()
+        const actionResult = await client.action('ai/actions:chat' as any, {
+          operation: resolveOperation(options),
+          skillSlug: options?.skillSlug,
+          modelRole: role.value,
+          model: provider.model,
+          messages,
+          temperature: options?.temperature,
+          maxTokens: options?.maxTokens,
+        })
+
+        result = {
+          content: actionResult?.content ?? '',
+          citations: actionResult?.citations,
+          model: actionResult?.model ?? provider.model,
+          creditsCharged: actionResult?.creditsCharged,
+          remainingCredits: actionResult?.remainingCredits,
+          providerCostUsdMicros: actionResult?.providerCostUsdMicros,
+        }
+      } else {
+        result = await provider.chat({ messages, ...options })
       }
-      // Store citations if present (from Perplexity/Sonar)
+
+      console.log(
+        '[useAI] Result → content length:',
+        result.content.length,
+        'model:',
+        result.model,
+        'creditsCharged:',
+        result.creditsCharged ?? 'n/a'
+      )
+
+      if (!result.content.trim()) {
+        throw new Error(
+          'AI returned an empty response. The model may be overloaded or unavailable. Try again or switch models in Settings.'
+        )
+      }
+
       if (result.citations && result.citations.length > 0) {
         citations.value = result.citations
       }
@@ -68,17 +105,25 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
     try {
       const provider = getProviderForRole(role.value)
       console.log('[useAI] Stream using provider:', provider.name, 'model:', provider.model)
-      await provider.chatStream(
-        { messages, ...options },
-        (chunk) => {
+
+      if (provider.name === 'OpenRouter') {
+        const result = await sendMessage(messages, options)
+        if (!result) return
+        streamingContent.value = result.content
+        onChunk?.(result.content)
+      } else {
+        await provider.chatStream({ messages, ...options }, (chunk) => {
           if (chunk.content) {
             streamingContent.value += chunk.content
             onChunk?.(chunk.content)
           }
-        }
-      )
+        })
+      }
+
       if (!streamingContent.value.trim()) {
-        throw new Error('AI returned an empty response. The model may be overloaded or unavailable. Try again or switch models in Settings.')
+        throw new Error(
+          'AI returned an empty response. The model may be overloaded or unavailable. Try again or switch models in Settings.'
+        )
       }
     } catch (err) {
       console.error('[useAI] streamMessage error:', err)

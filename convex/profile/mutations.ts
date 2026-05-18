@@ -35,7 +35,7 @@ export const upsert = mutation({
       location: args.location,
       bibleTranslation: args.bibleTranslation,
       onboardingComplete: args.onboardingComplete,
-      creditBalance: 100,
+      creditBalance: 50,
     })
   },
 })
@@ -59,7 +59,7 @@ export const createMinimal = mutation({
       userId,
       churchName: "",
       pastorName: args.pastorName ?? "",
-      creditBalance: 100,
+      creditBalance: 50,
     })
   },
 })

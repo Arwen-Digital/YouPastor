@@ -23,6 +23,25 @@ export const deleteAllAccountsAndUsers = mutation({
     await ctx.db.delete(profile._id)
   }
 
-    return { deleted: { accounts: accounts.length, sessions: sessions.length, users: users.length, profiles: profiles.length } }
+  const aiUsage = await ctx.db.query("aiUsage").collect()
+  for (const entry of aiUsage) {
+    await ctx.db.delete(entry._id)
+  }
+
+  const creditLedger = await ctx.db.query("creditLedger").collect()
+  for (const entry of creditLedger) {
+    await ctx.db.delete(entry._id)
+  }
+
+    return {
+      deleted: {
+        accounts: accounts.length,
+        sessions: sessions.length,
+        users: users.length,
+        profiles: profiles.length,
+        aiUsage: aiUsage.length,
+        creditLedger: creditLedger.length,
+      },
+    }
   },
 })

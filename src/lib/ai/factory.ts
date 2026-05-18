@@ -6,12 +6,9 @@ import { MockProvider } from './mock'
 export function createProvider(config: ProviderConfig): AIProvider {
   switch (config.type) {
     case 'openrouter':
-      if (!config.apiKey) {
-        throw new Error('OpenRouter requires an API key (VITE_AI_API_KEY)')
-      }
       return new OpenRouterProvider(
         config.model,
-        config.apiKey,
+        config.apiKey ?? '',
         config.baseUrl
       )
 

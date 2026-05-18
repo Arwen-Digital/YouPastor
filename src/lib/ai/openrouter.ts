@@ -118,13 +118,6 @@ export class OpenRouterProvider implements AIProvider {
     return {
       content,
       citations: citations.length > 0 ? citations : undefined,
-      usage: data.usage
-        ? {
-            promptTokens: data.usage.prompt_tokens,
-            completionTokens: data.usage.completion_tokens,
-            totalTokens: data.usage.total_tokens,
-          }
-        : undefined,
       model: data.model ?? this.model,
     }
   }

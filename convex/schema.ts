@@ -19,6 +19,48 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]),
 
+  aiUsage: defineTable({
+    userId: v.id("users"),
+    operation: v.string(),
+    skillSlug: v.optional(v.string()),
+    modelRole: v.union(
+      v.literal("orchestrator"),
+      v.literal("generator"),
+      v.literal("researcher")
+    ),
+    model: v.string(),
+    provider: v.literal("openrouter"),
+    providerRequestId: v.optional(v.string()),
+    providerCostUsdMicros: v.number(),
+    creditsCharged: v.number(),
+    status: v.union(
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("refunded")
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_operation", ["operation"]),
+
+  creditLedger: defineTable({
+    userId: v.id("users"),
+    amount: v.number(),
+    type: v.union(
+      v.literal("grant"),
+      v.literal("usage"),
+      v.literal("refund"),
+      v.literal("adjustment"),
+      v.literal("subscription_grant")
+    ),
+    reason: v.string(),
+    aiUsageId: v.optional(v.id("aiUsage")),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_created", ["userId", "createdAt"]),
+
   // Skill definitions — loaded from skills/ directory
   skills: defineTable({
     slug: v.string(),
