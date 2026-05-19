@@ -629,7 +629,7 @@ function getStatusLabel(status: string | undefined): string {
     case 'active': return 'Active'
     case 'completed': return 'Completed'
     case 'planned': return 'Planned'
-    default: return 'Draft'
+    default: return ''
   }
 }
 
@@ -1033,7 +1033,12 @@ const filteredList = computed(() => {
               </div>
               <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                 <span v-if="item.date" class="shrink-0">{{ formatDate(item.date) }}</span>
-                <span :class="['text-xs px-1.5 py-0.5 rounded font-medium', getStatusColor(item.status)]">{{ getStatusLabel(item.status) }}</span>
+                <span
+                  v-if="getStatusLabel(item.status)"
+                  :class="['text-xs px-1.5 py-0.5 rounded font-medium', getStatusColor(item.status)]"
+                >
+                  {{ getStatusLabel(item.status) }}
+                </span>
               </div>
             </div>
           </button>
@@ -1053,7 +1058,10 @@ const filteredList = computed(() => {
             <div class="space-y-1 min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-2xl font-semibold tracking-tight text-foreground">{{ seriesDetail.series.title }}</h2>
-                <span :class="['text-xs px-2 py-0.5 rounded-full font-medium shrink-0', getStatusColor(seriesDetail.series.status)]">
+                <span
+                  v-if="getStatusLabel(seriesDetail.series.status)"
+                  :class="['text-xs px-2 py-0.5 rounded-full font-medium shrink-0', getStatusColor(seriesDetail.series.status)]"
+                >
                   {{ getStatusLabel(seriesDetail.series.status) }}
                 </span>
               </div>

@@ -68,7 +68,7 @@ function stripHtml(html: string): string {
             </div>
             <div class="space-y-1">
               <h2 class="text-lg font-semibold text-foreground">Create a sermon</h2>
-              <p class="text-sm text-muted-foreground">Start a new sermon draft from a series or as a standalone message.</p>
+              <p class="text-sm text-muted-foreground">Start a new sermon from a series or as a standalone message.</p>
             </div>
           </div>
 
@@ -136,7 +136,7 @@ function stripHtml(html: string): string {
             </div>
             <div class="space-y-1">
               <h2 class="text-lg font-semibold text-foreground">Edit a sermon</h2>
-              <p class="text-sm text-muted-foreground">Open one of your latest sermon drafts.</p>
+              <p class="text-sm text-muted-foreground">Open one of your latest sermons.</p>
             </div>
           </div>
 

@@ -1157,7 +1157,7 @@ function handleSaveModalClose() {
           </div>
 
           <div v-else class="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-            No saved blog posts found yet. You can still paste your current blog draft content.
+            No saved blog posts found yet. You can still paste your current blog content.
           </div>
 
           <button
