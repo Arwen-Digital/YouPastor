@@ -64,7 +64,7 @@ Keep output lightweight unless the pastor asks for depth.
    - Mark uncertainty and avoid false confidence
 
 4. **Scripture Support**
-   - For Bible verse requests, use `VITE_AI_MODEL_RESEARCHER` to generate the response
+   - For Bible verse requests, use `VITE_AI_MODEL_GENERATOR` to generate the response
    - Provide requested verses (example: John 3:16 CSB)
    - If exact wording cannot be verified, say so clearly and offer reference-level help
    - Suggest cross-references only when they genuinely strengthen the point

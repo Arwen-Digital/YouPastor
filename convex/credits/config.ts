@@ -2,9 +2,9 @@ export const FREE_SIGNUP_CREDITS = 50
 
 export const AI_OPERATION_CREDITS = {
   orchestrator_intake: 1,
-  sermon_research: 20,
-  sermon_brainstorm: 12,
-  series_plan: 15,
+  sermon_research: 14,
+  sermon_brainstorm: 10,
+  series_plan: 12,
   sermon_to_blog: 10,
   sermon_to_youtube: 8,
   sermon_companion: 6,
