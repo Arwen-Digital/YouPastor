@@ -115,6 +115,7 @@ const props = defineProps<{
   subtitle: string
   initialMessage: string
   aiRole?: 'orchestrator' | 'generator' | 'researcher'
+  embedded?: boolean
 }>()
 
 const router = useRouter()
@@ -126,6 +127,7 @@ const { isLoading, streamingContent, error, streamMessage, sendMessage, citation
 const isSeriesPlanner = props.skillSlug === 'sermon-series'
 const isSermonResearch = props.skillSlug === 'sermon-research'
 const isSermonBrainstorm = props.skillSlug === 'sermon-brainstorm'
+const isSermonCompanion = props.skillSlug === 'sermon-companion'
 const isMeetingAgenda = props.skillSlug === 'meeting-agenda'
 const isMidweekDevotional = props.skillSlug === 'midweek-devotional'
 const isSermonToBlog = props.skillSlug === 'sermon-to-blog'
@@ -143,6 +145,7 @@ function getSkillOperation(): AIOperation {
   if (isSeriesPlanner) return 'series_plan'
   if (isSermonResearch) return 'sermon_research'
   if (isSermonBrainstorm) return 'sermon_brainstorm'
+  if (isSermonCompanion) return 'sermon_companion'
   if (isMeetingAgenda) return 'meeting_agenda'
   if (isMidweekDevotional) return 'midweek_devotional'
   if (isSermonToBlog) return 'sermon_to_blog'
@@ -160,6 +163,7 @@ function getCurrentChatOperation(): AIOperation {
   if (isIntakePhase.value) return 'orchestrator_intake'
   if (isSermonResearch) return 'sermon_research'
   if (isSermonBrainstorm) return 'sermon_brainstorm'
+  if (isSermonCompanion) return 'sermon_companion'
   return getSkillOperation()
 }
 
@@ -477,7 +481,14 @@ const canSave = computed(() => {
 const insufficientCreditsMessage = computed(() => {
   const msg = error.value?.message ?? ''
   const match = msg.match(/INSUFFICIENT_CREDITS:\s*(.*)$/s)
-  return match?.[1]?.trim() || null
+  const raw = match?.[1]?.trim()
+  if (!raw) return null
+
+  return raw
+    .replace(/\s+at handler\s*\([^)]+\)/g, '')
+    .replace(/\s+at async handler\s*\([^)]+\)/g, '')
+    .replace(/\s+Called by client\s*/g, '')
+    .trim()
 })
 
 function goToBilling() {
@@ -1039,8 +1050,8 @@ function handleSaveModalClose() {
 </script>
 
 <template>
-  <div class="flex flex-col h-[calc(100vh)]">
-    <div class="flex items-center gap-3 border-b px-4 py-3 bg-background shrink-0">
+  <div :class="['flex flex-col', props.embedded ? 'h-full' : 'h-[calc(100vh)]']">
+    <div v-if="!props.embedded" class="flex items-center gap-3 border-b px-4 py-3 bg-background shrink-0">
       <button
         @click="router.push('/')"
         class="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"

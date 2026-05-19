@@ -12,6 +12,7 @@ export type AIOperation =
   | 'series_plan'
   | 'sermon_to_blog'
   | 'sermon_to_youtube'
+  | 'sermon_companion'
   | 'small_group_questions'
   | 'church_social_post'
   | 'social_media_calendar'

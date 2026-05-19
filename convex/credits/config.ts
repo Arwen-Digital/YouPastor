@@ -7,6 +7,7 @@ export const AI_OPERATION_CREDITS = {
   series_plan: 15,
   sermon_to_blog: 10,
   sermon_to_youtube: 8,
+  sermon_companion: 6,
   small_group_questions: 8,
   church_social_post: 5,
   social_media_calendar: 10,

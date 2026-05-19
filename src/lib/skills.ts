@@ -2,6 +2,7 @@ import foundationPrompt from '../../skills/foundation/pastor-foundation/SKILL.md
 import brainstormPrompt from '../../skills/sermon-prep/sermon-brainstorm/SKILL.md?raw'
 import researchPrompt from '../../skills/sermon-prep/sermon-research/SKILL.md?raw'
 import seriesPrompt from '../../skills/sermon-prep/sermon-series/SKILL.md?raw'
+import companionPrompt from '../../skills/sermon-prep/sermon-companion/SKILL.md?raw'
 import blogPrompt from '../../skills/sermon-repurposing/sermon-to-blog/SKILL.md?raw'
 import youtubePrompt from '../../skills/sermon-repurposing/sermon-to-youtube/SKILL.md?raw'
 import smallGroupPrompt from '../../skills/sermon-repurposing/small-group-questions/SKILL.md?raw'
@@ -18,6 +19,7 @@ const skills: Record<string, string> = {
   'sermon-brainstorm': brainstormPrompt,
   'sermon-research': researchPrompt,
   'sermon-series': seriesPrompt,
+  'sermon-companion': companionPrompt,
   'sermon-to-blog': blogPrompt,
   'sermon-to-youtube': youtubePrompt,
   'small-group-questions': smallGroupPrompt,

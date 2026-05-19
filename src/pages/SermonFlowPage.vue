@@ -22,6 +22,7 @@ import {
 } from 'lucide-vue-next'
 import { getConvexClient } from '@/lib/convex'
 import { useConvexMutation } from '@/composables/useConvexMutation'
+import SkillChat from '@/components/SkillChat.vue'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -49,7 +50,7 @@ let brainstormUnsub: (() => void) | null = null
 let researchUnsub: (() => void) | null = null
 let seriesSermonsUnsub: (() => void) | null = null
 
-const activeTab = ref<'series' | 'brainstorm' | 'research'>('series')
+const activeTab = ref<'series' | 'brainstorm' | 'research' | 'assist'>('series')
 const selectedBrainstorm = ref<any>(null)
 const selectedResearch = ref<any>(null)
 const previewMode = ref(false)
@@ -500,6 +501,12 @@ async function handleSave() {
               >
                 Research
               </button>
+              <button
+                @click="activeTab = 'assist'; clearSelectedResource()"
+                :class="['resource-tab', activeTab === 'assist' ? 'resource-tab-active' : '']"
+              >
+                Sermon Assist
+              </button>
             </div>
           </div>
 
@@ -631,6 +638,30 @@ async function handleSave() {
                   {{ resourceSeriesId ? 'No brainstorm briefs are linked to this series yet.' : 'No brainstorm briefs found yet.' }}
                 </div>
               </template>
+            </div>
+
+            <!-- Sermon Assist -->
+            <div v-else-if="activeTab === 'assist'" class="space-y-3">
+              <div class="rounded-xl border border-border bg-card p-4 space-y-2">
+                <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Sparkles class="h-3.5 w-3.5" />
+                  Sermon Companion
+                </div>
+                <p class="text-sm text-muted-foreground">
+                  Use this chat for in-writing sermon help: illustration options, tighter transitions, theological clarification, and quick verse support.
+                </p>
+              </div>
+
+              <div class="h-[70vh] overflow-hidden rounded-xl border border-border bg-card">
+                <SkillChat
+                  skillSlug="sermon-companion"
+                  title="Sermon Assist"
+                  subtitle="Conversational help while you write"
+                  initialMessage="I'm writing my sermon and want focused help as I go."
+                  aiRole="generator"
+                  :embedded="true"
+                />
+              </div>
             </div>
 
             <!-- Research -->
