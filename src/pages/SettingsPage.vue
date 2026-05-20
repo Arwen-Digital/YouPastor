@@ -76,12 +76,20 @@ function formatDate(ts?: number): string {
           <p class="text-sm text-muted-foreground">Current Credits</p>
           <p class="mt-1 text-3xl font-semibold">{{ creditBalance }}</p>
         </div>
-        <button
-          @click="router.push('/upgrade')"
-          class="inline-flex items-center rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Manage credits & upgrade
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <button
+            @click="router.push('/upgrade')"
+            class="inline-flex items-center rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Manage credits & upgrade
+          </button>
+          <button
+            @click="router.push('/feedback')"
+            class="inline-flex items-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+          >
+            Send feedback
+          </button>
+        </div>
       </div>
 
       <div class="rounded-xl border bg-card p-5 space-y-4">

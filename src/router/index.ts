@@ -136,6 +136,11 @@ const routes = [
         component: () => import('@/pages/SettingsPage.vue'),
       },
       {
+        path: 'feedback',
+        name: 'feedback',
+        component: () => import('@/pages/FeedbackPage.vue'),
+      },
+      {
         path: 'upgrade',
         name: 'upgrade',
         component: () => import('@/pages/UpgradePage.vue'),
