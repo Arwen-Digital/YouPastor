@@ -40,6 +40,9 @@ export CONVEX_SELF_HOSTED_ADMIN_KEY="$ADMIN_KEY"
 
 printf 'JWT_PRIVATE_KEY=%s\n' "$JWT_PRIVATE_KEY" > /tmp/convex.local.env
 printf 'JWKS=%s\n' "$JWKS" >> /tmp/convex.local.env
+if [ -n "${BREVO_API_KEY:-}" ]; then
+  printf 'BREVO_API_KEY=%s\n' "$BREVO_API_KEY" >> /tmp/convex.local.env
+fi
 
 for _ in $(seq 1 30); do
   if npx convex env set --from-file /tmp/convex.local.env --force >/tmp/convex-env-set.log 2>&1; then
