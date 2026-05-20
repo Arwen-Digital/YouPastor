@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
   LogOut,
+  Shield,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -32,6 +33,7 @@ const hideSidebar = computed(() => route.meta.hideSidebar === true)
 const LOW_CREDIT_THRESHOLD = 20
 const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
 const showLowCreditNotice = computed(() => creditBalance.value <= LOW_CREDIT_THRESHOLD)
+const isAdminUser = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
 const lowCreditProgress = computed(() => {
   const pct = (creditBalance.value / LOW_CREDIT_THRESHOLD) * 100
   return Math.max(0, Math.min(100, pct))
@@ -212,6 +214,19 @@ function navigateTo(path: string) {
         >
           <Settings class="h-4 w-4" />
           Settings
+        </button>
+        <button
+          v-if="isAdminUser"
+          @click="navigateTo('/admin')"
+          :class="[
+            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+            isActive('/admin')
+              ? 'bg-accent text-accent-foreground font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+          ]"
+        >
+          <Shield class="h-4 w-4" />
+          Admin
         </button>
         <button
           @click="navigateTo('/upgrade')"

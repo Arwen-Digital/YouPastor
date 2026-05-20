@@ -140,6 +140,12 @@ const routes = [
         name: 'upgrade',
         component: () => import('@/pages/UpgradePage.vue'),
       },
+      {
+        path: 'admin',
+        name: 'admin',
+        component: () => import('@/pages/AdminPage.vue'),
+        meta: { adminOnly: true },
+      },
     ],
   },
   {
@@ -161,6 +167,7 @@ router.beforeEach((to, _from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true)
   const isPublic = to.matched.some((record) => record.meta.public === true)
   const isOnboarding = to.matched.some((record) => record.meta.onboarding === true)
+  const isAdminOnly = to.matched.some((record) => record.meta.adminOnly === true)
 
   // Route requires auth but user is not authenticated → login
   if (requiresAuth && !auth.isAuthenticated) {
@@ -189,6 +196,14 @@ router.beforeEach((to, _from, next) => {
   if (auth.isAuthenticated && !auth.user?.needsOnboarding && isOnboarding) {
     next('/')
     return
+  }
+
+  if (isAdminOnly) {
+    const email = (auth.user?.email ?? '').toLowerCase()
+    if (email !== 'arnold@lifecity.ph') {
+      next('/')
+      return
+    }
   }
 
   next()
