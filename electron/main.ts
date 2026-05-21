@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, session, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { registerIpcHandlers } from './ipc'
@@ -44,6 +44,11 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
     },
+  })
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url)
+    return { action: 'deny' }
   })
 
   win.webContents.on('did-finish-load', () => {

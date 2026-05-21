@@ -55,11 +55,21 @@ const plans = [
   },
 ] as const
 
+function isElectronRuntime(): boolean {
+  return typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent)
+}
+
 async function openCheckoutUrl(url: string) {
   if (window.appLinks?.openExternal) {
     const ok = await window.appLinks.openExternal(url)
     if (ok) return
+    throw new Error('Could not open your browser from the desktop app.')
   }
+
+  if (isElectronRuntime()) {
+    throw new Error('Desktop bridge unavailable. Please restart the app and try again.')
+  }
+
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
