@@ -19,7 +19,6 @@ import {
   Heart,
   List,
   Settings,
-  Zap,
   ChevronDown,
   ChevronRight,
   LogOut,
@@ -70,7 +69,6 @@ interface NavItem {
 const topNav: NavItem[] = [
   { label: 'Home', icon: Home, path: '/' },
   { label: 'Notebook', icon: Notebook, path: '/notebook' },
-  { label: 'Create Sermons', icon: BookOpen, path: '/sermons' },
 ]
 
 const workspaceSections: NavItem[] = [
@@ -79,9 +77,10 @@ const workspaceSections: NavItem[] = [
     icon: BookOpen,
     section: 'sermon-prep',
     children: [
-      { label: 'Brainstorm', icon: Lightbulb, path: '/brainstorm' },
-      { label: 'Research', icon: ResearchIcon, path: '/research' },
       { label: 'Series Planner', icon: Layers, path: '/series' },
+      { label: 'Research', icon: ResearchIcon, path: '/research' },
+      { label: 'Brainstorm', icon: Lightbulb, path: '/brainstorm' },
+      { label: 'Create Sermons', icon: BookOpen, path: '/sermons' },
     ],
   },
   {
@@ -203,6 +202,10 @@ function navigateTo(path: string) {
             </button>
           </div>
         </div>
+        <div v-if="auth.user?.email" class="pb-2 px-3 mb-1.5 border-b border-border/40 flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+          <span class="truncate font-medium" :title="auth.user.email">{{ auth.user.email }}</span>
+        </div>
         <button
           @click="navigateTo('/settings')"
           :class="[
@@ -227,13 +230,6 @@ function navigateTo(path: string) {
         >
           <Shield class="h-4 w-4" />
           Admin
-        </button>
-        <button
-          @click="navigateTo('/upgrade')"
-          class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-        >
-          <Zap class="h-4 w-4" />
-          Upgrade
         </button>
         <button
           @click="handleSignOut"

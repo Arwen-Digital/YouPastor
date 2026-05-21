@@ -135,3 +135,81 @@ export const recordUsageFailure = internalMutation({
     return true
   },
 })
+
+export const refillFreeUsersMonthly = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now()
+    const periodKey = new Date(now).toISOString().slice(0, 7)
+    const reason = `Free monthly refill (${periodKey})`
+
+    const profiles = await ctx.db.query("churchProfiles").collect()
+    const subscriptions = await ctx.db.query("subscriptions").collect()
+
+    const latestSubscriptionByUser = new Map<string, any>()
+    for (const subscription of subscriptions) {
+      const key = String(subscription.userId)
+      const existing = latestSubscriptionByUser.get(key)
+      if (!existing || (subscription.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
+        latestSubscriptionByUser.set(key, subscription)
+      }
+    }
+
+    let checked = 0
+    let refilled = 0
+    let skippedPaid = 0
+    let skippedAlreadyRefilled = 0
+
+    for (const profile of profiles) {
+      checked += 1
+      const subscription = latestSubscriptionByUser.get(String(profile.userId))
+      const isActivePaid =
+        subscription?.planTier !== undefined &&
+        subscription.planTier !== "free" &&
+        (subscription.subscriptionStatus === "active" ||
+          subscription.subscriptionStatus === "trialing" ||
+          subscription.subscriptionStatus === "past_due")
+
+      if (isActivePaid) {
+        skippedPaid += 1
+        continue
+      }
+
+      const recentLedger = await ctx.db
+        .query("creditLedger")
+        .withIndex("by_user_created", (q: any) => q.eq("userId", profile.userId))
+        .order("desc")
+        .take(200)
+
+      if (recentLedger.some((entry: any) => entry.reason === reason)) {
+        skippedAlreadyRefilled += 1
+        continue
+      }
+
+      const grantAmount = Math.max(0, FREE_SIGNUP_CREDITS - profile.creditBalance)
+      if (grantAmount <= 0) continue
+
+      await ctx.db.patch(profile._id, {
+        creditBalance: profile.creditBalance + grantAmount,
+      })
+
+      await ctx.db.insert("creditLedger", {
+        userId: profile.userId,
+        amount: grantAmount,
+        type: "grant",
+        reason,
+        createdAt: now,
+      })
+
+      refilled += 1
+    }
+
+    return {
+      periodKey,
+      checked,
+      refilled,
+      skippedPaid,
+      skippedAlreadyRefilled,
+    }
+  },
+})

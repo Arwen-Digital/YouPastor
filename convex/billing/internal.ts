@@ -101,13 +101,19 @@ export const syncSubscriptionFromWebhook = internalMutation({
 
     if (!profile) throw new Error("Failed to load profile")
 
-    const subscriptionStatus: SubscriptionStatus = normalizeSubscriptionStatus(args.subscriptionStatus)
+    const incomingSubscriptionStatus: SubscriptionStatus = normalizeSubscriptionStatus(args.subscriptionStatus)
 
     let subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", resolvedUserId))
       .order("desc")
       .first()
+
+    const subscriptionStatus: SubscriptionStatus = incomingSubscriptionStatus !== "none"
+      ? incomingSubscriptionStatus
+      : (args.eventName === "subscription_payment_success" || args.eventName === "subscription_payment_recovered")
+        ? "active"
+        : (subscription?.subscriptionStatus ?? "none")
 
     const mappedPlanTier: PlanTier = planFromVariantId(args.lemonsqueezyVariantId ?? undefined)
     const planTier: PlanTier = args.lemonsqueezyVariantId

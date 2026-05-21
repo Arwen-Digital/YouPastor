@@ -45,3 +45,7 @@ docker-compose*.yml
 
 # Local scripts
 scripts/
+
+# Release output
+release/
+
