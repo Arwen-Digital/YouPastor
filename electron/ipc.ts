@@ -1,4 +1,4 @@
-import { ipcMain, safeStorage } from 'electron'
+import { ipcMain, safeStorage, shell } from 'electron'
 
 const secrets = new Map<string, string>()
 
@@ -33,5 +33,15 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('secrets:delete', (_event, key: string) => {
     return secrets.delete(key)
+  })
+
+  ipcMain.handle('external:open', async (_event, url: string) => {
+    if (!url || typeof url !== 'string') return false
+    try {
+      await shell.openExternal(url)
+      return true
+    } catch {
+      return false
+    }
   })
 }

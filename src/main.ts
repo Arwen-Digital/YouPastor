@@ -22,6 +22,20 @@ async function bootstrap() {
     window.ipcRenderer?.on('main-process-message', (_event: any, message: any) => {
       console.log(message)
     })
+
+    window.ipcRenderer?.on('deep-link', async (_event: any, url: string) => {
+      try {
+        const parsed = new URL(url)
+        const path = parsed.pathname
+        if (path === '/billing/success') {
+          await router.push({ path: '/upgrade', query: { checkout: 'success' } })
+        } else if (path === '/billing/cancel') {
+          await router.push({ path: '/upgrade', query: { checkout: 'cancel' } })
+        }
+      } catch (err) {
+        console.warn('[deep-link] Failed to parse URL', err)
+      }
+    })
   })
 }
 

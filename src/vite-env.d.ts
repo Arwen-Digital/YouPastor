@@ -10,3 +10,9 @@ declare module '*?raw' {
   const content: string
   export default content
 }
+
+interface Window {
+  appLinks?: {
+    openExternal: (url: string) => Promise<boolean>
+  }
+}

@@ -16,6 +16,19 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST
 
 let win: BrowserWindow | null
+let pendingDeepLink: string | null = null
+
+function emitDeepLink(url: string) {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('deep-link', url)
+  } else {
+    pendingDeepLink = url
+  }
+}
+
+function extractDeepLink(argv: string[]): string | null {
+  return argv.find((arg) => arg.startsWith('youpastor://')) ?? null
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -35,6 +48,10 @@ function createWindow() {
 
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
+    if (pendingDeepLink) {
+      win?.webContents.send('deep-link', pendingDeepLink)
+      pendingDeepLink = null
+    }
   })
 
   if (VITE_DEV_SERVER_URL) {
@@ -57,7 +74,30 @@ app.on('activate', () => {
   }
 })
 
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const deepLink = extractDeepLink(argv)
+    if (deepLink) emitDeepLink(deepLink)
+
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  emitDeepLink(url)
+})
+
 app.whenReady().then(() => {
+  app.setAsDefaultProtocolClient('youpastor')
+  const deepLink = extractDeepLink(process.argv)
+  if (deepLink) pendingDeepLink = deepLink
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {

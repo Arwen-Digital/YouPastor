@@ -27,3 +27,7 @@ contextBridge.exposeInMainWorld('secretStore', {
   delete: (key: string) =>
     ipcRenderer.invoke('secrets:delete', key),
 })
+
+contextBridge.exposeInMainWorld('appLinks', {
+  openExternal: (url: string) => ipcRenderer.invoke('external:open', url),
+})

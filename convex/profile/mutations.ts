@@ -1,6 +1,7 @@
 import { mutation } from "../_generated/server"
 import { v } from "convex/values"
 import { getAuthUserId } from "@convex-dev/auth/server"
+import { FREE_SIGNUP_CREDITS } from "../credits/config"
 
 export const upsert = mutation({
   args: {
@@ -35,7 +36,7 @@ export const upsert = mutation({
       location: args.location,
       bibleTranslation: args.bibleTranslation,
       onboardingComplete: args.onboardingComplete,
-      creditBalance: 50,
+      creditBalance: FREE_SIGNUP_CREDITS,
     })
   },
 })
@@ -59,7 +60,7 @@ export const createMinimal = mutation({
       userId,
       churchName: "",
       pastorName: args.pastorName ?? "",
-      creditBalance: 50,
+      creditBalance: FREE_SIGNUP_CREDITS,
     })
   },
 })

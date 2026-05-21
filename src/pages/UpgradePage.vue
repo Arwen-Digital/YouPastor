@@ -1,13 +1,26 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Check, Zap } from 'lucide-vue-next'
 import { useConvexQuery } from '@/composables/useConvexQuery'
+import { useConvexAction } from '@/composables/useConvexAction'
 import { useAuthStore } from '@/stores/auth'
 
+const route = useRoute()
 const auth = useAuthStore()
-const { result: balanceResult } = useConvexQuery('credits/queries:getMyBalance' as any)
 
-const creditBalance = computed(() => balanceResult.value?.creditBalance ?? auth.user?.creditBalance ?? 0)
+const { result: billingResult } = useConvexQuery('billing/queries:getMyPlanAndCredits' as any)
+const { run: createCheckout, isLoading: checkoutLoading, error: checkoutActionError } = useConvexAction('billing/actions:createCheckout' as any)
+
+const creditBalance = computed(() => billingResult.value?.creditBalance ?? auth.user?.creditBalance ?? 0)
+const currentPlan = computed(() => billingResult.value?.planTier ?? 'free')
+const loadingPlan = ref<'starter' | 'pro' | null>(null)
+const checkoutError = ref<string | null>(null)
+
+const checkoutStatus = computed(() => {
+  const value = route.query.checkout
+  return Array.isArray(value) ? value[0] : value
+})
 
 const plans = [
   {
@@ -32,24 +45,47 @@ const plans = [
   },
   {
     key: 'pro',
-    name: 'Pro',
+    name: 'Plus',
     price: '$19',
     period: '/month',
     credits: '1000 credits',
-    description: 'Best for heavy weekly workflows across multiple skills.',
-    cta: 'Choose Pro',
+    description: 'Built for heavy weekly workflows across multiple skills.',
+    cta: 'Choose Plus',
     featured: true,
   },
 ] as const
 
-function handleChoosePlan(planKey: string) {
-  // LemonSqueezy checkout wiring will be added next.
-  console.log('[Upgrade] choose plan:', planKey)
+async function openCheckoutUrl(url: string) {
+  if (window.appLinks?.openExternal) {
+    const ok = await window.appLinks.openExternal(url)
+    if (ok) return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+async function handleChoosePlan(planKey: string) {
+  if (planKey !== 'starter' && planKey !== 'pro') return
+
+  checkoutError.value = null
+  loadingPlan.value = planKey
+
+  try {
+    const result: any = await createCheckout({ tier: planKey })
+    if (!result?.checkoutUrl) {
+      throw new Error('Checkout URL was not returned.')
+    }
+
+    await openCheckoutUrl(result.checkoutUrl)
+  } catch (err: any) {
+    checkoutError.value = err?.message || checkoutActionError.value?.message || 'Unable to start checkout.'
+  } finally {
+    loadingPlan.value = null
+  }
 }
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto py-8 space-y-6">
+  <div class="max-w-5xl mx-auto px-4 md:px-6 py-8 space-y-6">
     <div class="rounded-2xl border bg-card p-6 md:p-7">
       <div class="flex items-center gap-3">
         <Zap class="h-6 w-6 text-primary" />
@@ -59,6 +95,17 @@ function handleChoosePlan(planKey: string) {
       <div class="mt-4 inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
         <span class="text-xs text-muted-foreground">Current credits</span>
         <span class="text-sm font-semibold text-foreground">{{ creditBalance }}</span>
+        <span class="text-xs text-muted-foreground">• {{ currentPlan }}</span>
+      </div>
+
+      <div v-if="checkoutStatus === 'success'" class="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+        Checkout successful. Your subscription update is being synced.
+      </div>
+      <div v-else-if="checkoutStatus === 'cancel'" class="mt-4 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+        Checkout was canceled. You can upgrade anytime.
+      </div>
+      <div v-else-if="checkoutError" class="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        {{ checkoutError }}
       </div>
     </div>
 
@@ -98,20 +145,21 @@ function handleChoosePlan(planKey: string) {
 
         <button
           @click="handleChoosePlan(plan.key)"
+          :disabled="plan.key === 'free' || checkoutLoading || loadingPlan === plan.key"
           :class="[
-            'w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+            'w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
             plan.featured
               ? 'bg-primary text-primary-foreground hover:bg-primary/90'
               : 'border border-border text-foreground hover:bg-muted',
           ]"
         >
-          {{ plan.cta }}
+          {{ loadingPlan === plan.key ? 'Opening checkout...' : plan.cta }}
         </button>
       </div>
     </div>
 
     <p class="text-xs text-muted-foreground text-center">
-      Secure checkout powered by LemonSqueezy (integration wiring next).
+      Secure checkout powered by LemonSqueezy.
     </p>
   </div>
 </template>

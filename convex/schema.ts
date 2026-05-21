@@ -61,6 +61,37 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_created", ["userId", "createdAt"]),
 
+  subscriptions: defineTable({
+    userId: v.id("users"),
+    planTier: v.union(v.literal("free"), v.literal("starter"), v.literal("pro")),
+    subscriptionStatus: v.union(
+      v.literal("active"),
+      v.literal("past_due"),
+      v.literal("canceled"),
+      v.literal("trialing"),
+      v.literal("none"),
+      v.literal("paused"),
+      v.literal("expired")
+    ),
+    lemonsqueezyCustomerId: v.optional(v.string()),
+    lemonsqueezySubscriptionId: v.optional(v.string()),
+    lemonsqueezyVariantId: v.optional(v.string()),
+    currentPeriodEnd: v.optional(v.number()),
+    lastCreditsResetAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_lsq_subscription", ["lemonsqueezySubscriptionId"])
+    .index("by_lsq_customer", ["lemonsqueezyCustomerId"]),
+
+  billingWebhookEvents: defineTable({
+    eventId: v.string(),
+    eventName: v.string(),
+    processedAt: v.number(),
+  })
+    .index("by_event_id", ["eventId"]),
+
   // Skill definitions — loaded from skills/ directory
   skills: defineTable({
     slug: v.string(),

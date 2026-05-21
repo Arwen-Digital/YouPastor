@@ -63,7 +63,7 @@ export const useAuthStore = defineStore('auth', () => {
       _id: 'dev-user',
       email: email ?? 'pastor@youpastor.app',
       name: name ?? 'Pastor Arnold',
-      creditBalance: 50,
+      creditBalance: 100,
       hasProfile: true,
       needsOnboarding: false,
     }

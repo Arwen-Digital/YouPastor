@@ -1,4 +1,4 @@
-export const FREE_SIGNUP_CREDITS = 50
+export const FREE_SIGNUP_CREDITS = 100
 
 export const AI_OPERATION_CREDITS = {
   orchestrator_intake: 1,
