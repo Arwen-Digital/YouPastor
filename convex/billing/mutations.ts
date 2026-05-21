@@ -12,7 +12,7 @@ export const redeemVoucher = mutation({
     if (!userId) throw new Error("Not authenticated")
 
     const code = args.code.trim().toUpperCase()
-    if (!code) throw new Error("Voucher code is required")
+    if (!code) return { success: false, message: "Voucher code is required" }
 
     // Find the voucher
     const voucher = await ctx.db
@@ -21,7 +21,7 @@ export const redeemVoucher = mutation({
       .first()
 
     if (!voucher) {
-      throw new Error("Invalid voucher code")
+      return { success: false, message: "Invalid voucher code" }
     }
 
     // Check if already redeemed by this user
@@ -31,7 +31,7 @@ export const redeemVoucher = mutation({
       .first()
 
     if (alreadyRedeemed) {
-      throw new Error("You have already redeemed this voucher code")
+      return { success: false, message: "You have already redeemed this voucher code" }
     }
 
     // Get or create church profile

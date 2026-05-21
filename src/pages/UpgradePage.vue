@@ -151,7 +151,7 @@ async function handleRedeemVoucher() {
     redeemSuccess.value = `Successfully redeemed voucher. +${res.creditsAdded} credits have been added to your balance!`
     voucherCode.value = ''
   } else {
-    redeemError.value = redeemErrorRef.value?.message || 'Invalid voucher code or already redeemed.'
+    redeemError.value = res?.message || redeemErrorRef.value?.message || 'Invalid voucher code or already redeemed.'
   }
 }
 </script>
