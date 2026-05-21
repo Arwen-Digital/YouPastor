@@ -70,38 +70,12 @@ export const recordUsageSuccess = internalMutation({
       )
     }
 
-    const now = Date.now()
-
-    const aiUsageId = await ctx.db.insert("aiUsage", {
-      userId,
-      operation: args.operation,
-      skillSlug: args.skillSlug,
-      modelRole: args.modelRole,
-      model: args.model,
-      provider: "openrouter",
-      providerRequestId: args.providerRequestId,
-      providerCostUsdMicros: args.providerCostUsdMicros,
-      creditsCharged: args.creditsCharged,
-      status: "succeeded",
-      createdAt: now,
-    })
-
-    await ctx.db.insert("creditLedger", {
-      userId,
-      amount: -args.creditsCharged,
-      type: "usage",
-      reason: `AI usage: ${args.operation}`,
-      aiUsageId,
-      createdAt: now,
-    })
-
     const newBalance = profile.creditBalance - args.creditsCharged
     await ctx.db.patch(profile._id, {
       creditBalance: newBalance,
     })
 
     return {
-      aiUsageId,
       remainingCredits: newBalance,
     }
   },
@@ -114,24 +88,7 @@ export const recordUsageFailure = internalMutation({
     modelRole: v.union(v.literal("orchestrator"), v.literal("generator"), v.literal("researcher")),
     model: v.string(),
   },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx)
-    if (!userId) throw new Error("Not authenticated")
-
-    await ctx.db.insert("aiUsage", {
-      userId,
-      operation: args.operation,
-      skillSlug: args.skillSlug,
-      modelRole: args.modelRole,
-      model: args.model,
-      provider: "openrouter",
-      providerRequestId: undefined,
-      providerCostUsdMicros: 0,
-      creditsCharged: 0,
-      status: "failed",
-      createdAt: Date.now(),
-    })
-
+  handler: async () => {
     return true
   },
 })

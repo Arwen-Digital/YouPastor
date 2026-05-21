@@ -18,9 +18,37 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 let win: BrowserWindow | null
 let pendingDeepLink: string | null = null
 
+function getDeepLinkRoute(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    const routePath = parsed.hostname ? `/${parsed.hostname}${parsed.pathname}` : parsed.pathname
+
+    if (routePath === '/billing/success') return '/billing/success'
+    if (routePath === '/billing/cancel') return '/upgrade?checkout=cancel'
+    return null
+  } catch {
+    return null
+  }
+}
+
+function navigateToRoute(route: string) {
+  if (!win || win.isDestroyed()) return
+
+  if (VITE_DEV_SERVER_URL) {
+    void win.loadURL(`${VITE_DEV_SERVER_URL}#${route}`)
+  } else {
+    void win.loadFile(path.join(RENDERER_DIST, 'index.html'), { hash: route })
+  }
+}
+
 function emitDeepLink(url: string) {
   if (win && !win.isDestroyed()) {
-    win.webContents.send('deep-link', url)
+    const route = getDeepLinkRoute(url)
+    if (route) {
+      navigateToRoute(route)
+    } else {
+      win.webContents.send('deep-link', url)
+    }
   } else {
     pendingDeepLink = url
   }
@@ -54,8 +82,16 @@ function createWindow() {
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
     if (pendingDeepLink) {
-      win?.webContents.send('deep-link', pendingDeepLink)
+      const deepLink = pendingDeepLink
       pendingDeepLink = null
+      setTimeout(() => {
+        const route = getDeepLinkRoute(deepLink)
+        if (route) {
+          navigateToRoute(route)
+        } else {
+          win?.webContents.send('deep-link', deepLink)
+        }
+      }, 300)
     }
   })
 
@@ -100,6 +136,7 @@ app.on('open-url', (event, url) => {
 })
 
 app.whenReady().then(() => {
+  app.setName('YouPastor')
   app.setAsDefaultProtocolClient('youpastor')
   const deepLink = extractDeepLink(process.argv)
   if (deepLink) pendingDeepLink = deepLink

@@ -168,12 +168,6 @@ export const chat = action({
         providerCostUsdMicros: usageCostMicros,
       }
     } catch (err) {
-      await ctx.runMutation("credits/internal:recordUsageFailure" as any, {
-        operation,
-        skillSlug: args.skillSlug,
-        modelRole: args.modelRole,
-        model: args.model,
-      })
       throw err
     }
   },

@@ -4,6 +4,14 @@ import { router } from './router'
 import App from './App.vue'
 import './assets/main.css'
 
+function getDeepLinkPath(url: string): string {
+  const parsed = new URL(url)
+  if (parsed.protocol === 'youpastor:' && parsed.hostname) {
+    return `/${parsed.hostname}${parsed.pathname}`
+  }
+  return parsed.pathname
+}
+
 async function bootstrap() {
   const app = createApp(App)
   app.use(createPinia())
@@ -25,10 +33,9 @@ async function bootstrap() {
 
     window.ipcRenderer?.on('deep-link', async (_event: any, url: string) => {
       try {
-        const parsed = new URL(url)
-        const path = parsed.pathname
+        const path = getDeepLinkPath(url)
         if (path === '/billing/success') {
-          await router.push({ path: '/upgrade', query: { checkout: 'success' } })
+          await router.push({ path: '/billing/success' })
         } else if (path === '/billing/cancel') {
           await router.push({ path: '/upgrade', query: { checkout: 'cancel' } })
         }

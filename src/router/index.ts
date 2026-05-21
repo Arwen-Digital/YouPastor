@@ -161,6 +161,11 @@ const routes = [
         component: () => import('@/pages/UpgradePage.vue'),
       },
       {
+        path: 'billing/success',
+        name: 'billing-success',
+        component: () => import('@/pages/BillingSuccessPage.vue'),
+      },
+      {
         path: 'admin',
         name: 'admin',
         component: () => import('@/pages/AdminPage.vue'),

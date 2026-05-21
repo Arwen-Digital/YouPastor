@@ -4,6 +4,14 @@
   "appId": "com.youpastor.app",
   "asar": true,
   "productName": "YouPastor",
+  "protocols": [
+    {
+      "name": "YouPastor",
+      "schemes": [
+        "youpastor"
+      ]
+    }
+  ],
   "directories": {
     "output": "release/${version}"
   },

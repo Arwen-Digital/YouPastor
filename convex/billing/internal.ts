@@ -109,18 +109,34 @@ export const syncSubscriptionFromWebhook = internalMutation({
       .order("desc")
       .first()
 
-    const subscriptionStatus: SubscriptionStatus = incomingSubscriptionStatus !== "none"
-      ? incomingSubscriptionStatus
-      : (args.eventName === "subscription_payment_success" || args.eventName === "subscription_payment_recovered")
-        ? "active"
-        : (subscription?.subscriptionStatus ?? "none")
+    const forcedInactiveStatus: SubscriptionStatus | null =
+      args.eventName === "subscription_expired" || args.eventName.includes("refunded")
+        ? "expired"
+        : args.eventName === "subscription_cancelled"
+          ? "canceled"
+          : null
+
+    const subscriptionStatus: SubscriptionStatus = forcedInactiveStatus
+      ?? (incomingSubscriptionStatus !== "none"
+        ? incomingSubscriptionStatus
+        : (args.eventName === "subscription_payment_success" || args.eventName === "subscription_payment_recovered")
+          ? "active"
+          : (subscription?.subscriptionStatus ?? "none"))
+
+    const shouldDowngradeToFree =
+      subscriptionStatus === "canceled" ||
+      subscriptionStatus === "expired" ||
+      args.eventName === "order_refunded" ||
+      args.eventName === "subscription_payment_refunded"
 
     const mappedPlanTier: PlanTier = planFromVariantId(args.lemonsqueezyVariantId ?? undefined)
-    const planTier: PlanTier = args.lemonsqueezyVariantId
-      ? (mappedPlanTier === "free" && subscription?.planTier && subscription.planTier !== "free"
-        ? subscription.planTier
-        : mappedPlanTier)
-      : (subscription?.planTier ?? "free")
+    const planTier: PlanTier = shouldDowngradeToFree
+      ? "free"
+      : args.lemonsqueezyVariantId
+        ? (mappedPlanTier === "free" && subscription?.planTier && subscription.planTier !== "free"
+          ? subscription.planTier
+          : mappedPlanTier)
+        : (subscription?.planTier ?? "free")
 
     console.log("[billing] webhook", args.eventName, {
       resolvedUserId,
