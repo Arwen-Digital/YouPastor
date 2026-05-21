@@ -166,3 +166,17 @@ export const getBillingDebug = query({
     }
   },
 })
+
+export const listVouchers = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx)
+
+    const vouchers = await ctx.db
+      .query("vouchers")
+      .order("desc")
+      .collect()
+
+    return vouchers
+  },
+})

@@ -362,4 +362,20 @@ export default defineSchema({
     customRules: v.optional(v.string()),
   })
     .index("by_user", ["userId"]),
+
+  vouchers: defineTable({
+    code: v.string(),
+    credits: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_code", ["code"]),
+
+  voucherRedemptions: defineTable({
+    userId: v.id("users"),
+    voucherId: v.id("vouchers"),
+    redeemedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_voucher", ["voucherId"])
+    .index("by_user_voucher", ["userId", "voucherId"]),
 })

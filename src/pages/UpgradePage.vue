@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Check, Zap } from 'lucide-vue-next'
+import { Check, Zap, Ticket } from 'lucide-vue-next'
 import { useConvexQuery } from '@/composables/useConvexQuery'
 import { useConvexAction } from '@/composables/useConvexAction'
+import { useConvexMutation } from '@/composables/useConvexMutation'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -128,6 +129,31 @@ async function handleChoosePlan(planKey: string) {
     loadingPlan.value = null
   }
 }
+
+// Voucher redemption
+const voucherCode = ref('')
+const redeemSuccess = ref<string | null>(null)
+const redeemError = ref<string | null>(null)
+const { mutate: redeem, isLoading: isRedeeming, error: redeemErrorRef } = useConvexMutation('billing/mutations:redeemVoucher' as any)
+
+async function handleRedeemVoucher() {
+  const code = voucherCode.value.trim().toUpperCase()
+  if (!code) {
+    redeemError.value = 'Voucher code is required'
+    return
+  }
+
+  redeemSuccess.value = null
+  redeemError.value = null
+
+  const res: any = await redeem({ code })
+  if (res?.success) {
+    redeemSuccess.value = `Successfully redeemed voucher. +${res.creditsAdded} credits have been added to your balance!`
+    voucherCode.value = ''
+  } else {
+    redeemError.value = redeemErrorRef.value?.message || 'Invalid voucher code or already redeemed.'
+  }
+}
 </script>
 
 <template>
@@ -201,6 +227,41 @@ async function handleChoosePlan(planKey: string) {
         >
           {{ loadingPlan === plan.key ? 'Opening checkout...' : getPlanCta(plan.key) }}
         </button>
+      </div>
+    </div>
+
+    <!-- Redeem Voucher Section -->
+    <div class="rounded-2xl border bg-card p-6 md:p-7 shadow-sm">
+      <div class="flex items-center gap-3">
+        <Ticket class="h-6 w-6 text-primary" />
+        <h3 class="text-lg font-semibold tracking-tight text-foreground">Redeem Voucher</h3>
+      </div>
+      <p class="mt-1 text-sm text-muted-foreground">Have a promotional voucher code? Enter it below to add credits to your account immediately.</p>
+      
+      <div class="mt-4 max-w-md space-y-3">
+        <div class="flex gap-2">
+          <input
+            v-model="voucherCode"
+            @keydown.enter.prevent="handleRedeemVoucher"
+            type="text"
+            placeholder="e.g. PASTOR24"
+            class="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring uppercase font-mono tracking-wider placeholder:font-sans placeholder:tracking-normal"
+          />
+          <button
+            @click="handleRedeemVoucher"
+            :disabled="isRedeeming || !voucherCode.trim()"
+            class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {{ isRedeeming ? 'Applying...' : 'Apply' }}
+          </button>
+        </div>
+
+        <p v-if="redeemSuccess" class="text-sm text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 font-medium">
+          {{ redeemSuccess }}
+        </p>
+        <p v-if="redeemError" class="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 font-medium">
+          {{ redeemError }}
+        </p>
       </div>
     </div>
 

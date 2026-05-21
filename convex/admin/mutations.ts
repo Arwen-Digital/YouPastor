@@ -128,8 +128,58 @@ export const fixSubscriptionTier = mutation({
 
     return {
       subscriptionId: subscription?._id,
-      planTier,
+      planTier: planTier,
       subscriptionStatus: status,
     }
+  },
+})
+
+export const createVoucher = mutation({
+  args: {
+    code: v.string(),
+    credits: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx)
+
+    const code = args.code.trim().toUpperCase()
+    if (!code) throw new Error("Voucher code is required")
+    if (!/^[A-Z0-9_-]+$/.test(code)) {
+      throw new Error("Voucher code must contain only letters, numbers, dashes, or underscores")
+    }
+
+    const credits = Math.floor(args.credits)
+    if (credits <= 0) throw new Error("Credits must be greater than 0")
+
+    const existing = await ctx.db
+      .query("vouchers")
+      .withIndex("by_code", (q: any) => q.eq("code", code))
+      .first()
+
+    if (existing) throw new Error("Voucher code already exists")
+
+    const voucherId = await ctx.db.insert("vouchers", {
+      code,
+      credits,
+      createdAt: Date.now(),
+    })
+
+    return { voucherId, code, credits }
+  },
+})
+
+export const deleteVoucher = mutation({
+  args: {
+    voucherId: v.id("vouchers"),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx)
+
+    const voucher = await ctx.db.get(args.voucherId)
+    if (!voucher) throw new Error("Voucher not found")
+
+    await ctx.db.delete(args.voucherId)
+
+    return { success: true }
   },
 })
