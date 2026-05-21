@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Check, Zap } from 'lucide-vue-next'
 import { useConvexQuery } from '@/composables/useConvexQuery'
@@ -13,7 +13,18 @@ const { result: billingResult } = useConvexQuery('billing/queries:getMyPlanAndCr
 const { run: createCheckout, isLoading: checkoutLoading, error: checkoutActionError } = useConvexAction('billing/actions:createCheckout' as any)
 
 const creditBalance = computed(() => billingResult.value?.creditBalance ?? auth.user?.creditBalance ?? 0)
-const currentPlan = computed(() => billingResult.value?.planTier ?? 'free')
+const lastKnownPlan = ref<'free' | 'starter' | 'pro'>('free')
+watch(
+  () => billingResult.value?.planTier,
+  (plan) => {
+    if (plan === 'free' || plan === 'starter' || plan === 'pro') {
+      lastKnownPlan.value = plan
+    }
+  },
+  { immediate: true }
+)
+const currentPlan = computed<'free' | 'starter' | 'pro'>(() => lastKnownPlan.value)
+const normalizedCurrentPlan = computed<'free' | 'starter' | 'pro'>(() => currentPlan.value)
 const loadingPlan = ref<'starter' | 'pro' | null>(null)
 const checkoutError = ref<string | null>(null)
 
@@ -63,14 +74,39 @@ async function openCheckoutUrl(url: string) {
   if (window.appLinks?.openExternal) {
     const ok = await window.appLinks.openExternal(url)
     if (ok) return
-    throw new Error('Could not open your browser from the desktop app.')
+  }
+
+  const legacyIpc = (window as any).ipcRenderer
+  if (legacyIpc?.invoke) {
+    const ok = await legacyIpc.invoke('external:open', url)
+    if (ok) return
+  }
+
+  const popup = window.open(url, '_blank', 'noopener,noreferrer')
+  if (popup) {
+    popup.opener = null
+    return
   }
 
   if (isElectronRuntime()) {
-    throw new Error('Desktop bridge unavailable. Please restart the app and try again.')
+    return
   }
 
-  window.open(url, '_blank', 'noopener,noreferrer')
+  throw new Error('Your browser blocked the checkout popup. Please allow popups and try again.')
+}
+
+function getPlanCta(planKey: string): string {
+  if (planKey === normalizedCurrentPlan.value) return 'Current'
+  if (planKey === 'free') return 'Downgrade to Free'
+  if (planKey === 'starter') return 'Choose Starter'
+  return 'Choose Plus'
+}
+
+function isPlanActionDisabled(planKey: string): boolean {
+  if (checkoutLoading.value || loadingPlan.value === planKey) return true
+  if (planKey === normalizedCurrentPlan.value) return true
+  if (planKey === 'free') return true
+  return false
 }
 
 async function handleChoosePlan(planKey: string) {
@@ -155,7 +191,7 @@ async function handleChoosePlan(planKey: string) {
 
         <button
           @click="handleChoosePlan(plan.key)"
-          :disabled="plan.key === 'free' || checkoutLoading || loadingPlan === plan.key"
+          :disabled="isPlanActionDisabled(plan.key)"
           :class="[
             'w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
             plan.featured
@@ -163,7 +199,7 @@ async function handleChoosePlan(planKey: string) {
               : 'border border-border text-foreground hover:bg-muted',
           ]"
         >
-          {{ loadingPlan === plan.key ? 'Opening checkout...' : plan.cta }}
+          {{ loadingPlan === plan.key ? 'Opening checkout...' : getPlanCta(plan.key) }}
         </button>
       </div>
     </div>

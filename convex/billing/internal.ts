@@ -101,13 +101,30 @@ export const syncSubscriptionFromWebhook = internalMutation({
 
     if (!profile) throw new Error("Failed to load profile")
 
-    const planTier: PlanTier = planFromVariantId(args.lemonsqueezyVariantId ?? undefined)
     const subscriptionStatus: SubscriptionStatus = normalizeSubscriptionStatus(args.subscriptionStatus)
 
     let subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", resolvedUserId))
+      .order("desc")
       .first()
+
+    const mappedPlanTier: PlanTier = planFromVariantId(args.lemonsqueezyVariantId ?? undefined)
+    const planTier: PlanTier = args.lemonsqueezyVariantId
+      ? (mappedPlanTier === "free" && subscription?.planTier && subscription.planTier !== "free"
+        ? subscription.planTier
+        : mappedPlanTier)
+      : (subscription?.planTier ?? "free")
+
+    console.log("[billing] webhook", args.eventName, {
+      resolvedUserId,
+      variantId: args.lemonsqueezyVariantId,
+      mappedPlanTier,
+      existingPlanTier: subscription?.planTier,
+      finalPlanTier: planTier,
+      status: subscriptionStatus,
+      grantCredits: args.grantCredits,
+    })
 
     if (!subscription) {
       const subId = await ctx.db.insert("subscriptions", {
@@ -138,6 +155,7 @@ export const syncSubscriptionFromWebhook = internalMutation({
     if (args.grantCredits) {
       const targetCredits = creditsForPlan(planTier)
       const grantAmount = Math.max(0, targetCredits - profile.creditBalance)
+      console.log("[billing] grantCredits", { planTier, targetCredits, currentBalance: profile.creditBalance, grantAmount })
       if (grantAmount > 0) {
         await ctx.db.patch(profile._id, {
           creditBalance: profile.creditBalance + grantAmount,
@@ -155,6 +173,7 @@ export const syncSubscriptionFromWebhook = internalMutation({
       const latestSubscription = await ctx.db
         .query("subscriptions")
         .withIndex("by_user", (q) => q.eq("userId", resolvedUserId))
+        .order("desc")
         .first()
       if (latestSubscription) {
         await ctx.db.patch(latestSubscription._id, {

@@ -2,6 +2,7 @@ import { mutation } from "../_generated/server"
 import { v } from "convex/values"
 import { getAuthUserId } from "@convex-dev/auth/server"
 import { FREE_SIGNUP_CREDITS } from "../credits/config"
+import { creditsForPlan, type PlanTier } from "../billing/config"
 
 async function requireAdmin(ctx: any) {
   const userId = await getAuthUserId(ctx)
@@ -60,5 +61,75 @@ export const giftCredits = mutation({
     })
 
     return { creditBalance: newBalance }
+  },
+})
+
+export const fixSubscriptionTier = mutation({
+  args: {
+    userId: v.id("users"),
+    planTier: v.union(v.literal("free"), v.literal("starter"), v.literal("pro")),
+    subscriptionStatus: v.optional(v.union(
+      v.literal("active"), v.literal("past_due"), v.literal("canceled"),
+      v.literal("trialing"), v.literal("none"), v.literal("paused"), v.literal("expired")
+    )),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx)
+
+    const now = Date.now()
+    const planTier = args.planTier as PlanTier
+    const status = args.subscriptionStatus ?? "active"
+
+    let subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+      .order("desc")
+      .first()
+
+    if (!subscription) {
+      const subId = await ctx.db.insert("subscriptions", {
+        userId: args.userId,
+        planTier,
+        subscriptionStatus: status,
+        currentPeriodEnd: undefined,
+        lastCreditsResetAt: undefined,
+        createdAt: now,
+        updatedAt: now,
+      })
+      subscription = await ctx.db.get(subId)
+    } else {
+      await ctx.db.patch(subscription._id, {
+        planTier,
+        subscriptionStatus: status,
+        updatedAt: now,
+      })
+    }
+
+    // Ensure credits match the plan tier
+    let profile = await ctx.db
+      .query("churchProfiles")
+      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+      .first()
+
+    if (profile) {
+      const targetCredits = creditsForPlan(planTier)
+      if (profile.creditBalance < targetCredits) {
+        const grantAmount = targetCredits - profile.creditBalance
+        await ctx.db.patch(profile._id, { creditBalance: targetCredits })
+        await ctx.db.insert("creditLedger", {
+          userId: args.userId,
+          amount: grantAmount,
+          type: "adjustment",
+          reason: `Admin fix: set tier to ${planTier} and top up credits`,
+          createdAt: now,
+        })
+      }
+    }
+
+    return {
+      subscriptionId: subscription?._id,
+      planTier,
+      subscriptionStatus: status,
+    }
   },
 })

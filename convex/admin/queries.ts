@@ -120,3 +120,49 @@ export const getUserTransactions = query({
       .slice(0, 150)
   },
 })
+
+export const getBillingDebug = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx)
+
+    const subscriptions = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(20)
+
+    const webhookEvents = await ctx.db
+      .query("billingWebhookEvents")
+      .order("desc")
+      .take(50)
+
+    const profile = await ctx.db
+      .query("churchProfiles")
+      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+      .first()
+
+    return {
+      profile: profile
+        ? {
+            userId: profile.userId,
+            creditBalance: profile.creditBalance,
+          }
+        : null,
+      subscriptions: subscriptions.map((s: any) => ({
+        _id: s._id,
+        userId: s.userId,
+        planTier: s.planTier,
+        subscriptionStatus: s.subscriptionStatus,
+        lemonsqueezyCustomerId: s.lemonsqueezyCustomerId,
+        lemonsqueezySubscriptionId: s.lemonsqueezySubscriptionId,
+        lemonsqueezyVariantId: s.lemonsqueezyVariantId,
+        currentPeriodEnd: s.currentPeriodEnd,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+        _creationTime: s._creationTime,
+      })),
+      webhookEvents,
+    }
+  },
+})

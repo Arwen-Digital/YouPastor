@@ -512,7 +512,7 @@ async function handleSave() {
 
           <div class="min-h-0 flex-1 overflow-y-auto p-4">
             <!-- Series Details -->
-            <div v-if="activeTab === 'series'" class="space-y-4">
+            <div v-show="activeTab === 'series'" class="space-y-4">
               <div v-if="!resourceSeriesId" class="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
                 This is a standalone sermon. Link it to a series later if you want series details, brainstorms, and research to appear here.
               </div>
@@ -591,7 +591,7 @@ async function handleSave() {
             </div>
 
             <!-- Brainstorm -->
-            <div v-else-if="activeTab === 'brainstorm'" class="space-y-3">
+            <div v-show="activeTab === 'brainstorm'" class="space-y-3">
               <div v-if="selectedBrainstorm" class="space-y-3">
                 <button @click="selectedBrainstorm = null" class="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
                   <ArrowLeft class="h-3.5 w-3.5" />
@@ -641,7 +641,7 @@ async function handleSave() {
             </div>
 
             <!-- Sermon Assist -->
-            <div v-else-if="activeTab === 'assist'" class="space-y-3">
+            <div v-show="activeTab === 'assist'" class="space-y-3">
               <div class="rounded-xl border border-border bg-card p-4 space-y-2">
                 <div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <Sparkles class="h-3.5 w-3.5" />
@@ -665,7 +665,7 @@ async function handleSave() {
             </div>
 
             <!-- Research -->
-            <div v-else class="space-y-3">
+            <div v-show="activeTab === 'research'" class="space-y-3">
               <div v-if="selectedResearch" class="space-y-3">
                 <button @click="selectedResearch = null" class="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
                   <ArrowLeft class="h-3.5 w-3.5" />

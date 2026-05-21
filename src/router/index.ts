@@ -137,7 +137,22 @@ const routes = [
       },
       {
         path: 'feedback',
+        name: 'feedback-selector',
+        component: () => import('@/pages/FeedbackPage.vue'),
+      },
+      {
+        path: 'feedback/feedback',
         name: 'feedback',
+        component: () => import('@/pages/FeedbackPage.vue'),
+      },
+      {
+        path: 'feedback/bug-report',
+        name: 'feedback-bug-report',
+        component: () => import('@/pages/FeedbackPage.vue'),
+      },
+      {
+        path: 'feedback/feature-request',
+        name: 'feedback-feature-request',
         component: () => import('@/pages/FeedbackPage.vue'),
       },
       {
