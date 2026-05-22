@@ -31,7 +31,7 @@ const auth = useAuthStore()
 const hideSidebar = computed(() => route.meta.hideSidebar === true)
 const LOW_CREDIT_THRESHOLD = 20
 const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
-const showLowCreditNotice = computed(() => creditBalance.value <= LOW_CREDIT_THRESHOLD)
+const showLowCreditNotice = computed(() => !!auth.user && creditBalance.value <= LOW_CREDIT_THRESHOLD)
 const isAdminUser = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
 const lowCreditProgress = computed(() => {
   const pct = (creditBalance.value / LOW_CREDIT_THRESHOLD) * 100

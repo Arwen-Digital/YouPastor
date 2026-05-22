@@ -1,7 +1,36 @@
-import { app, BrowserWindow, session, shell } from 'electron'
+import { app, BrowserWindow, session, shell, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import http from 'node:http'
 import { registerIpcHandlers } from './ipc'
+
+// Starts a one-shot local HTTP server that captures the OAuth callback from the browser.
+// Returns the port immediately so the caller can embed it in the redirectTo URI before calling Convex.
+// When the browser hits the callback, it converts it to a youpastor:// deep link and emits it.
+function startCallbackServer(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end('<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Sign-in complete!</h2><p>You can close this tab and return to YouPastor.</p><script>window.close()</script></body></html>')
+      server.close()
+
+      const incoming = new URL(req.url ?? '/', 'http://127.0.0.1')
+
+      if (win && !win.isDestroyed()) {
+        const code = incoming.searchParams.get('code')
+        const state = incoming.searchParams.get('state') ?? ''
+        const route = `/auth/callback?code=${encodeURIComponent(code ?? '')}&state=${encodeURIComponent(state)}`
+        navigateToRoute(route)
+      }
+    })
+
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number }
+      resolve(addr.port)
+    })
+  })
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -140,6 +169,12 @@ app.whenReady().then(() => {
   app.setAsDefaultProtocolClient('youpastor')
   const deepLink = extractDeepLink(process.argv)
   if (deepLink) pendingDeepLink = deepLink
+  
+  // IPC: start local callback server, return the port so renderer can pass it as redirectTo to Convex
+  ipcMain.handle('auth:startCallbackServer', async () => {
+    return startCallbackServer()
+  })
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {

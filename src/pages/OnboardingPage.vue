@@ -143,6 +143,7 @@ async function markOnboardingDone() {
     console.error('Failed to mark onboarding complete:', err)
   }
   isComplete.value = true
+  await auth.fetchUser()
   auth.markOnboardingComplete()
   setTimeout(() => {
     router.push('/')

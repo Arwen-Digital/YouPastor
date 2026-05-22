@@ -14,6 +14,7 @@ const confirmPassword = ref('')
 const name = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+const googleAuthEnabled = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true'
 
 const localError = ref('')
 const touched = ref(false)
@@ -66,6 +67,16 @@ watch(mode, () => {
   localError.value = ''
   auth.clearError()
 })
+
+async function handleGoogleSignIn() {
+  localError.value = ''
+  auth.clearError()
+
+  const success = await auth.signInWithGoogle()
+  if (success && auth.isAuthenticated) {
+    router.push(auth.user?.needsOnboarding ? '/onboarding' : '/')
+  }
+}
 
 async function handleSubmit() {
   touched.value = true
@@ -215,6 +226,28 @@ function switchMode(newMode: 'signin' | 'signup') {
           <AlertCircle class="h-4 w-4 text-destructive mt-0.5 shrink-0" />
           <p class="text-destructive">{{ displayError }}</p>
         </div>
+
+        <!-- Google sign in -->
+        <template v-if="googleAuthEnabled">
+          <button
+            type="button"
+            :disabled="auth.isLoading"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            @click="handleGoogleSignIn"
+          >
+            <span class="flex h-5 w-5 items-center justify-center rounded-full bg-background text-xs font-semibold text-foreground">G</span>
+            Continue with Google
+          </button>
+
+          <div class="relative">
+            <div class="absolute inset-0 flex items-center">
+              <span class="w-full border-t border-border" />
+            </div>
+            <div class="relative flex justify-center text-xs uppercase">
+              <span class="bg-background px-2 text-muted-foreground">Or continue with email</span>
+            </div>
+          </div>
+        </template>
 
         <!-- Form -->
         <form @submit.prevent="handleSubmit" class="space-y-4">

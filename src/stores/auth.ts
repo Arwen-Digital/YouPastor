@@ -17,7 +17,8 @@ export interface AuthUser {
 }
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
-const CONVEX_REQUEST_TIMEOUT = 8000 // 8 seconds
+const CONVEX_REQUEST_TIMEOUT = 20000 // 20 seconds
+const CONVEX_AUTH_OAUTH_VERIFIER_KEY = '__convexAuthOAuthVerifier'
 
 function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   return Promise.race([
@@ -156,6 +157,111 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function signInWithGoogle(): Promise<boolean> {
+    if (DEV_BYPASS) {
+      setDevUser()
+      return true
+    }
+
+    isLoading.value = true
+    error.value = null
+
+    // In Electron, start a local callback server to avoid custom protocol issues.
+    // The server captures Google's redirect and converts it to a deep-link event.
+    const appLinks = (window as any).appLinks
+    let redirectTo = 'youpastor://auth/callback'
+    if (appLinks?.startCallbackServer) {
+      try {
+        const port: number = await appLinks.startCallbackServer()
+        redirectTo = `http://127.0.0.1:${port}/callback`
+      } catch (err) {
+        console.warn('[auth] Could not start callback server, falling back to deep link', err)
+      }
+    }
+
+    // Retry up to 3 times in case Convex drops the connection briefly
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const client = getConvexClient()
+        const result: any = await withTimeout(
+          client.action('auth:signIn' as any, {
+            provider: 'google',
+            params: { redirectTo },
+          }),
+          'Google sign in'
+        )
+
+        if (!result?.redirect || !result?.verifier) {
+          throw new Error('Google sign-in URL was not returned.')
+        }
+
+        localStorage.setItem(CONVEX_AUTH_OAUTH_VERIFIER_KEY, result.verifier)
+        await openExternalUrl(String(result.redirect))
+        isLoading.value = false
+        return true
+      } catch (err: any) {
+        const isConnectionError = err.message?.includes('Connection lost') || err.message?.includes('timed out')
+        if (isConnectionError && attempt < 3) {
+          console.warn(`[auth] Google signIn attempt ${attempt} failed (${err.message}), retrying...`)
+          await new Promise(r => setTimeout(r, 1000 * attempt))
+          continue
+        }
+        console.error('[auth] Google signIn error:', err)
+        localStorage.removeItem(CONVEX_AUTH_OAUTH_VERIFIER_KEY)
+        error.value = parseAuthError(err)
+        isAuthenticated.value = false
+        isLoading.value = false
+        return false
+      }
+    }
+    isLoading.value = false
+    return false
+  }
+
+  async function completeGoogleSignIn(code: string): Promise<boolean> {
+    if (DEV_BYPASS) {
+      setDevUser()
+      return true
+    }
+
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const verifier = localStorage.getItem(CONVEX_AUTH_OAUTH_VERIFIER_KEY)
+      if (!verifier) {
+        throw new Error('Google sign-in session expired. Please try again.')
+      }
+
+      const client = getConvexClient()
+      const result: any = await withTimeout(
+        client.action('auth:signIn' as any, {
+          params: { code },
+          verifier,
+        }),
+        'Google sign in callback'
+      )
+
+      const token = result?.tokens?.token ?? null
+      const refreshToken = result?.tokens?.refreshToken ?? null
+      if (!token || !refreshToken) {
+        throw new Error('No auth tokens returned from server')
+      }
+
+      setConvexAuthToken(token, refreshToken)
+      localStorage.removeItem(CONVEX_AUTH_OAUTH_VERIFIER_KEY)
+      await fetchUser()
+      return isAuthenticated.value
+    } catch (err: any) {
+      console.error('[auth] Google callback error:', err)
+      error.value = parseAuthError(err)
+      isAuthenticated.value = false
+      return false
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function signUpWithPassword(
     email: string,
     password: string,
@@ -264,6 +370,8 @@ export const useAuthStore = defineStore('auth', () => {
     isReady,
     error,
     signInWithPassword,
+    signInWithGoogle,
+    completeGoogleSignIn,
     signUpWithPassword,
     signOut,
     fetchUser,
@@ -272,6 +380,28 @@ export const useAuthStore = defineStore('auth', () => {
     setCreditBalance,
   }
 })
+
+async function openExternalUrl(url: string) {
+  // Prefer Electron's shell.openExternal via IPC (opens system browser properly)
+  const appLinks = (window as any).appLinks
+  if (appLinks?.openExternal) {
+    await appLinks.openExternal(url)
+    return
+  }
+
+  // Web fallback: open in new tab
+  const opened = window.open(url, '_blank', 'noopener,noreferrer')
+  if (opened) {
+    opened.opener = null
+    return
+  }
+
+  // If we are in Electron without IPC, do NOT navigate the main window
+  const isElectron = navigator.userAgent.toLowerCase().includes('electron')
+  if (isElectron) return
+
+  window.location.href = url
+}
 
 async function retry<T>(
   fn: () => Promise<T>,

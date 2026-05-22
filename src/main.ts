@@ -31,17 +31,36 @@ async function bootstrap() {
       console.log(message)
     })
 
-    window.ipcRenderer?.on('deep-link', async (_event: any, url: string) => {
+    const handleDeepLink = async (_event: any, url: string) => {
       try {
         const path = getDeepLinkPath(url)
+        
         if (path === '/billing/success') {
           await router.push({ path: '/billing/success' })
         } else if (path === '/billing/cancel') {
           await router.push({ path: '/upgrade', query: { checkout: 'cancel' } })
+        } else if (path === '/auth/callback') {
+          const code = new URL(url).searchParams.get('code')
+          if (!code) throw new Error('Missing Google sign-in code')
+          
+          const success = await auth.completeGoogleSignIn(code)
+          if (success) {
+            await router.push(auth.user?.needsOnboarding ? '/onboarding' : '/')
+          } else {
+            await router.push('/login')
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn('[deep-link] Failed to parse URL', err)
       }
+    }
+
+    // Listen via IPC (preload bridge)
+    window.ipcRenderer?.on('deep-link', handleDeepLink)
+
+    // Listen via custom DOM event (executeJavaScript fallback — works even without preload)
+    window.addEventListener('youpastor-deep-link', (e: Event) => {
+      handleDeepLink(null, (e as CustomEvent).detail)
     })
   })
 }
