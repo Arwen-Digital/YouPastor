@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Send, ArrowLeft, Loader2, BookOpen } from 'lucide-vue-next'
+import { Send, ArrowLeft, Loader2, BookOpen, Copy, Check } from 'lucide-vue-next'
 import { marked } from 'marked'
 import { useAI } from '@/composables/useAI'
 import { buildSystemPrompt, buildContextBlock, type ChurchContext } from '@/lib/skills'
@@ -327,6 +327,20 @@ const selectedSermonId = ref<string | null>(null)
 const selectedBlogContext = ref('')
 const selectedBlogId = ref<string | null>(null)
 const hasStartedConversation = ref(false)
+const copiedIndex = ref<number | null>(null)
+
+function copyToClipboard(text: string, index: number) {
+  navigator.clipboard.writeText(text).then(() => {
+    copiedIndex.value = index
+    setTimeout(() => {
+      if (copiedIndex.value === index) {
+        copiedIndex.value = null
+      }
+    }, 2000)
+  }).catch((err) => {
+    console.error('Failed to copy text: ', err)
+  })
+}
 
 // Load church profile from Convex
 const { result: churchProfile } = useConvexQuery('profile/queries:getMine' as any)
@@ -1192,16 +1206,39 @@ function handleSaveModalClose() {
         >{{ msg.content }}</div>
         <div
           v-else
-          class="assistant-message max-w-[80%] rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed prose prose-sm prose-slate max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-h2:text-base prose-h2:font-semibold prose-h3:text-sm prose-h3:font-semibold prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-strong:text-foreground prose-hr:border-border prose-hr:my-3"
-          v-html="renderMarkdown(msg.content)"
-        />
+          class="group relative max-w-[80%]"
+        >
+          <div
+            class="assistant-message w-full rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed prose prose-sm prose-slate max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-h2:text-base prose-h2:font-semibold prose-h3:text-sm prose-h3:font-semibold prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-strong:text-foreground prose-hr:border-border prose-hr:my-3"
+            v-html="renderMarkdown(msg.content)"
+          />
+          <button
+            @click="copyToClipboard(msg.content, i)"
+            class="absolute bottom-2 right-2 p-1.5 rounded-lg bg-background/80 border border-border text-muted-foreground hover:text-foreground hover:bg-background opacity-0 group-hover:opacity-100 transition-all duration-150 shadow-sm"
+            title="Copy to clipboard"
+          >
+            <Check v-if="copiedIndex === i" class="h-3.5 w-3.5 text-emerald-600" />
+            <Copy v-else class="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
-      <div v-if="isLoading && streamingContent" class="flex justify-start">
-        <div
-          class="max-w-[80%] rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed prose prose-sm prose-slate max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-h2:text-base prose-h2:font-semibold prose-h3:text-sm prose-h3:font-semibold prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-strong:text-foreground prose-hr:border-border prose-hr:my-3"
-          v-html="renderedStreaming"
-        /><span class="animate-pulse ml-0.5 text-muted-foreground">|</span>
+      <div v-if="isLoading && streamingContent" class="flex justify-start items-center">
+        <div class="group relative max-w-[80%]">
+          <div
+            class="w-full rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed prose prose-sm prose-slate max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-h2:text-base prose-h2:font-semibold prose-h3:text-sm prose-h3:font-semibold prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-strong:text-foreground prose-hr:border-border prose-hr:my-3"
+            v-html="renderedStreaming"
+          />
+          <button
+            @click="copyToClipboard(streamingContent, -1)"
+            class="absolute bottom-2 right-2 p-1.5 rounded-lg bg-background/80 border border-border text-muted-foreground hover:text-foreground hover:bg-background opacity-0 group-hover:opacity-100 transition-all duration-150 shadow-sm"
+            title="Copy to clipboard"
+          >
+            <Check v-if="copiedIndex === -1" class="h-3.5 w-3.5 text-emerald-600" />
+            <Copy v-else class="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <span class="animate-pulse ml-0.5 text-muted-foreground">|</span>
       </div>
 
       <div v-if="isLoading && !streamingContent" class="flex justify-start">

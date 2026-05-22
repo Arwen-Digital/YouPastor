@@ -50,24 +50,15 @@ function stripHtml(html: string): string {
     <div class="max-w-5xl mx-auto px-6 py-10 space-y-10">
       
       <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div class="space-y-2">
-          <div class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-2">
-            <BookOpen class="h-3.5 w-3.5" />
-            Create Sermons
-          </div>
-          <h1 class="text-3xl font-semibold tracking-tight text-foreground">Sermons</h1>
-          <p class="text-sm text-muted-foreground">
-            Start a new message or continue working on a recent one.
-          </p>
+      <div class="space-y-2">
+        <div class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-2">
+          <BookOpen class="h-3.5 w-3.5" />
+          Create Sermons
         </div>
-        <button
-          @click="goStandalone('create')"
-          class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
-        >
-          <Plus class="h-4 w-4" />
-          New Standalone Sermon
-        </button>
+        <h1 class="text-3xl font-semibold tracking-tight text-foreground">Sermons</h1>
+        <p class="text-sm text-muted-foreground">
+          Start a new message or continue working on a recent one.
+        </p>
       </div>
 
       <div class="grid gap-8 md:grid-cols-12">
@@ -116,6 +107,23 @@ function stripHtml(html: string): string {
               No sermon series found yet.<br/>Create a series from the Series Planner first.
             </div>
           </div>
+
+          <!-- Standalone Sermon Button -->
+          <button
+            @click="goStandalone('create')"
+            class="w-full flex items-center justify-between p-4 rounded-2xl border border-dashed border-border bg-transparent hover:border-primary/50 hover:bg-primary/5 transition-all group"
+          >
+            <div class="flex items-center gap-4">
+              <div class="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                <Plus class="h-5 w-5" />
+              </div>
+              <div class="text-left">
+                <div class="text-sm font-medium text-foreground group-hover:text-primary transition-colors">New Standalone Sermon</div>
+                <div class="text-xs text-muted-foreground mt-0.5">Start a message without assigning it to a series</div>
+              </div>
+            </div>
+            <ChevronRight class="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          </button>
         </div>
 
         <!-- Right Column: Recent Sermons -->
