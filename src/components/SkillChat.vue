@@ -1085,8 +1085,8 @@ function handleSaveModalClose() {
         :class="[
           'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all shrink-0 whitespace-nowrap',
           canSave
-            ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm ring-1 ring-emerald-700/20'
-            : 'bg-emerald-100 text-emerald-400 border border-emerald-200 cursor-not-allowed',
+            ? 'bg-violet-600 text-white hover:bg-violet-500 shadow-sm ring-1 ring-violet-700/20'
+            : 'bg-violet-100 text-violet-400 border border-violet-200 dark:bg-violet-950/30 dark:text-violet-500/50 dark:border-violet-950/50 cursor-not-allowed',
         ]"
       >
         <BookOpen class="h-4 w-4" />

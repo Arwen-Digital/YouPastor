@@ -77,7 +77,7 @@
 
 @layer components {
   .save-notebook-btn {
-    @apply inline-flex items-center gap-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm ring-1 ring-emerald-700/20 transition-colors;
+    @apply inline-flex items-center gap-2 rounded-md bg-violet-600 text-white hover:bg-violet-500 shadow-sm ring-1 ring-violet-700/20 transition-colors;
   }
 
   .save-notebook-btn:disabled {
