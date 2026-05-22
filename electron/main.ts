@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell, ipcMain } from 'electron'
+import { app, BrowserWindow, session, shell, ipcMain, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import http from 'node:http'
@@ -43,6 +43,9 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST
+
+const appIconPath = path.join(process.env.VITE_PUBLIC, process.platform === 'darwin' ? 'icon-mac.png' : 'icon.png')
+app.setName('YouPastor')
 
 let win: BrowserWindow | null
 let pendingDeepLink: string | null = null
@@ -89,7 +92,7 @@ function extractDeepLink(argv: string[]): string | null {
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: appIconPath,
     title: 'YouPastor',
     width: 1280,
     height: 800,
@@ -166,6 +169,9 @@ app.on('open-url', (event, url) => {
 
 app.whenReady().then(() => {
   app.setName('YouPastor')
+  if (process.platform === 'darwin') {
+    app.dock?.setIcon(nativeImage.createFromPath(appIconPath))
+  }
   app.setAsDefaultProtocolClient('youpastor')
   const deepLink = extractDeepLink(process.argv)
   if (deepLink) pendingDeepLink = deepLink
