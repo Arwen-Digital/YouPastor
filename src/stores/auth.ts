@@ -435,6 +435,7 @@ function parseAuthError(err: any): string {
 
   const normalized = raw
     .replace(/\[CONVEX[^\]]*\]/g, ' ')
+    .replace(/\[Request ID:[^\]]+\]/g, ' ')
     .replace(/\bCalled by client\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -461,9 +462,12 @@ function parseAuthError(err: any): string {
     return 'Connection timed out. Make sure `npx convex dev` is running.'
   }
 
-  // Convex production can mask auth provider failures as "Server Error ... Called by client".
+  // Convex production can mask auth provider failures as generic server errors.
   if (normalized.includes('auth:signIn') && normalized.includes('Server Error')) {
     return 'No account found with this email. Try signing up instead.'
+  }
+  if (normalized === 'Server Error |' || normalized === 'Server Error' || normalized.startsWith('Server Error |')) {
+    return 'Invalid email or password. Please try again.'
   }
 
   return normalized || 'Something went wrong. Please try again.'
