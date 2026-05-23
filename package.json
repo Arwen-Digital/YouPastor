@@ -1,7 +1,7 @@
 {
   "name": "youpastor",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "productName": "YouPastor",
   "description": "Desktop-first AI Workspace for pastors",
   "type": "module",
