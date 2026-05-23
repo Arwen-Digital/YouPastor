@@ -44,9 +44,10 @@ const steps = [
   {
     key: 'location',
     label: 'Location',
-    description: 'What city and state is your church in?',
-    placeholder: 'Tulsa, Oklahoma',
+    description: 'What city/town and country is your church in?',
+    placeholder: 'City / Town',
     icon: MapPin,
+    isLocation: true,
   },
   {
     key: 'bibleTranslation',
@@ -56,6 +57,29 @@ const steps = [
     icon: BookMarked,
     isSelect: true,
   },
+]
+
+const countries = [
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
+  'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+  'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia',
+  'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica',
+  'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Democratic Republic of the Congo', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador',
+  'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France',
+  'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau',
+  'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland',
+  'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan',
+  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+  'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia',
+  'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal',
+  'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman', 'Pakistan',
+  'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania',
+  'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal',
+  'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea',
+  'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan',
+  'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
+  'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
 ]
 
 const bibleTranslations = [
@@ -77,6 +101,8 @@ const formValues = ref<Record<string, string>>({
   denomination: '',
   averageAttendance: '',
   location: '',
+  locationCity: '',
+  locationCountry: 'Philippines',
   bibleTranslation: 'NIV',
 })
 
@@ -87,12 +113,20 @@ const currentValue = computed({
 })
 
 const canProceed = computed(() => {
+  const stepKey = steps[currentStep.value].key
+
+  if (stepKey === 'location') {
+    return !!formValues.value.locationCity.trim() && !!formValues.value.locationCountry.trim()
+  }
+
   const val = currentValue.value?.trim()
   if (!val) return false
+
   // For attendance, ensure it's a number
-  if (steps[currentStep.value].key === 'averageAttendance') {
+  if (stepKey === 'averageAttendance') {
     return /^\d+$/.test(val)
   }
+
   return true
 })
 
@@ -113,7 +147,13 @@ async function handleNext() {
   try {
     const client = getConvexClient()
     const fieldKey = steps[currentStep.value].key
-    const fieldValue = formValues.value[fieldKey]
+    const fieldValue = fieldKey === 'location'
+      ? `${formValues.value.locationCity.trim()}, ${formValues.value.locationCountry.trim()}`
+      : formValues.value[fieldKey]
+
+    if (fieldKey === 'location') {
+      formValues.value.location = fieldValue
+    }
 
     // Save the current field to the database
     await client.mutation('profile/mutations:upsert' as any, {
@@ -278,6 +318,33 @@ async function handleSkip() {
                     <div class="text-xs text-muted-foreground">{{ translation.description }}</div>
                   </div>
                 </div>
+              </div>
+
+              <!-- Location step: City/Town + Country -->
+              <div v-else-if="currentStepData.isLocation" class="space-y-3">
+                <div class="space-y-1.5">
+                  <label class="text-xs text-muted-foreground">City / Town</label>
+                  <input
+                    v-model="formValues.locationCity"
+                    type="text"
+                    placeholder="City / Town"
+                    maxlength="100"
+                    class="flex h-12 w-full rounded-md border border-input bg-card px-4 py-3 text-base transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    @keydown.enter="canProceed && handleNext()"
+                  />
+                </div>
+
+                <div class="space-y-1.5">
+                  <label class="text-xs text-muted-foreground">Country</label>
+                  <select
+                    v-model="formValues.locationCountry"
+                    class="flex h-12 w-full rounded-md border border-input bg-card px-4 py-3 text-base transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option v-for="country in countries" :key="country" :value="country">{{ country }}</option>
+                  </select>
+                </div>
+
+                <p class="text-xs text-muted-foreground">You can change this later in Settings</p>
               </div>
 
               <!-- Text input for other fields -->
