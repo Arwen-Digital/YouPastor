@@ -6,6 +6,23 @@ import {
   type AIOperation,
 } from "../credits/config"
 
+const MODEL_ENV_BY_ROLE = {
+  orchestrator: ["AI_MODEL_ORCHESTRATOR", "VITE_AI_MODEL_ORCHESTRATOR"],
+  generator: ["AI_MODEL_GENERATOR", "VITE_AI_MODEL_GENERATOR"],
+  researcher: ["AI_MODEL_RESEARCHER", "VITE_AI_MODEL_RESEARCHER"],
+} as const
+
+type ModelRole = keyof typeof MODEL_ENV_BY_ROLE
+
+function resolveModelFromEnv(role: ModelRole): string {
+  const envKeys = MODEL_ENV_BY_ROLE[role]
+  for (const key of envKeys) {
+    const value = (process.env[key] ?? "").trim()
+    if (value) return value
+  }
+  throw new Error(`No model configured for role '${role}'. Set ${envKeys[0]} on Convex.`)
+}
+
 type OpenRouterResponse = {
   id?: string
   model?: string
@@ -77,7 +94,6 @@ export const chat = action({
     operation: v.string(),
     skillSlug: v.optional(v.string()),
     modelRole: v.union(v.literal("orchestrator"), v.literal("generator"), v.literal("researcher")),
-    model: v.string(),
     messages: v.array(
       v.object({
         role: v.union(v.literal("system"), v.literal("user"), v.literal("assistant")),
@@ -94,6 +110,7 @@ export const chat = action({
 
     const operation = args.operation as AIOperation
     const creditsToCharge = AI_OPERATION_CREDITS[operation]
+    const resolvedModel = resolveModelFromEnv(args.modelRole as ModelRole)
 
     await ctx.runMutation("credits/internal:assertSufficientCredits" as any, {
       requiredCredits: creditsToCharge,
@@ -117,7 +134,7 @@ export const chat = action({
           "X-Title": "YouPastor",
         },
         body: JSON.stringify({
-          model: args.model,
+          model: resolvedModel,
           messages: args.messages,
           temperature: args.temperature ?? 0.7,
           max_tokens: args.maxTokens,
@@ -149,11 +166,12 @@ export const chat = action({
       }
 
       const usageCostMicros = providerCostUsdMicros(data)
+      const resolvedResponseModel = data.model ?? resolvedModel
       const usageResult = await ctx.runMutation("credits/internal:recordUsageSuccess" as any, {
         operation,
         skillSlug: args.skillSlug,
         modelRole: args.modelRole,
-        model: data.model ?? args.model,
+        model: resolvedResponseModel,
         providerRequestId: data.id,
         providerCostUsdMicros: usageCostMicros,
         creditsCharged: creditsToCharge,
@@ -162,7 +180,7 @@ export const chat = action({
       return {
         content,
         citations: data.citations ?? choice?.message?.citations,
-        model: data.model ?? args.model,
+        model: resolvedResponseModel,
         creditsCharged: creditsToCharge,
         remainingCredits: usageResult?.remainingCredits,
         providerCostUsdMicros: usageCostMicros,

@@ -1,6 +1,6 @@
 import type { Message } from '@/lib/ai/types'
-import { getProviderForRole } from '@/lib/ai/factory'
 import type { AIRole } from '@/lib/ai/types'
+import { getConvexClient } from '@/lib/convex'
 
 /**
  * Shape of the extracted series data from a conversation.
@@ -66,8 +66,6 @@ export async function extractSeriesFromConversation(
   messages: Message[],
   role: AIRole = 'generator'
 ): Promise<ExtractedSeries | null> {
-  const provider = getProviderForRole(role)
-
   const extractionMessages: Message[] = [
     { role: 'system', content: EXTRACTION_PROMPT },
     ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -76,20 +74,25 @@ export async function extractSeriesFromConversation(
 
   try {
     console.log('[extractSeries] Sending extraction request, messages:', extractionMessages.length)
-    const result = await provider.chat({
+
+    const client = getConvexClient()
+    const result = await client.action('ai/actions:chat' as any, {
+      operation: 'save_extraction',
+      modelRole: role,
       messages: extractionMessages,
       temperature: 0.1,
     })
 
-    if (!result?.content) {
+    const content = result?.content ?? ''
+    if (!content) {
       console.error('[extractSeries] No content returned from AI')
       return null
     }
 
-    console.log('[extractSeries] AI response length:', result.content.length, 'first 200 chars:', result.content.slice(0, 200))
+    console.log('[extractSeries] AI response length:', content.length, 'first 200 chars:', content.slice(0, 200))
 
     // Strip markdown code fences if present
-    let jsonStr = result.content.trim()
+    let jsonStr = content.trim()
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
     }

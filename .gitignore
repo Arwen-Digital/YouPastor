@@ -28,6 +28,7 @@ dist-electron
 .env
 .env.local
 .env*.local
+.env.production
 
 # Convex
 convex/_generated/

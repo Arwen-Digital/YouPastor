@@ -6,7 +6,6 @@ import type {
   ChatCompletionResult,
   Message,
 } from '@/lib/ai/types'
-import { getProviderForRole } from '@/lib/ai/factory'
 import { getConvexClient } from '@/lib/convex'
 import { useAuthStore } from '@/stores/auth'
 
@@ -37,37 +36,29 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
     isLoading.value = true
     error.value = null
     try {
-      const provider = getProviderForRole(role.value)
-      console.log('[useAI] Using provider:', provider.name, 'model:', provider.model)
+      console.log('[useAI] Using backend OpenRouter role:', role.value)
 
-      let result: ChatCompletionResult
+      const client = getConvexClient()
+      const actionResult = await client.action('ai/actions:chat' as any, {
+        operation: resolveOperation(options),
+        skillSlug: options?.skillSlug,
+        modelRole: role.value,
+        messages,
+        temperature: options?.temperature,
+        maxTokens: options?.maxTokens,
+      })
 
-      if (provider.name === 'OpenRouter') {
-        const client = getConvexClient()
-        const actionResult = await client.action('ai/actions:chat' as any, {
-          operation: resolveOperation(options),
-          skillSlug: options?.skillSlug,
-          modelRole: role.value,
-          model: provider.model,
-          messages,
-          temperature: options?.temperature,
-          maxTokens: options?.maxTokens,
-        })
+      const result: ChatCompletionResult = {
+        content: actionResult?.content ?? '',
+        citations: actionResult?.citations,
+        model: actionResult?.model ?? role.value,
+        creditsCharged: actionResult?.creditsCharged,
+        remainingCredits: actionResult?.remainingCredits,
+        providerCostUsdMicros: actionResult?.providerCostUsdMicros,
+      }
 
-        result = {
-          content: actionResult?.content ?? '',
-          citations: actionResult?.citations,
-          model: actionResult?.model ?? provider.model,
-          creditsCharged: actionResult?.creditsCharged,
-          remainingCredits: actionResult?.remainingCredits,
-          providerCostUsdMicros: actionResult?.providerCostUsdMicros,
-        }
-
-        if (typeof actionResult?.remainingCredits === 'number') {
-          auth.setCreditBalance(actionResult.remainingCredits)
-        }
-      } else {
-        result = await provider.chat({ messages, ...options })
+      if (typeof actionResult?.remainingCredits === 'number') {
+        auth.setCreditBalance(actionResult.remainingCredits)
       }
 
       console.log(
@@ -109,22 +100,11 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
     citations.value = []
 
     try {
-      const provider = getProviderForRole(role.value)
-      console.log('[useAI] Stream using provider:', provider.name, 'model:', provider.model)
+      const result = await sendMessage(messages, options)
+      if (!result) return
 
-      if (provider.name === 'OpenRouter') {
-        const result = await sendMessage(messages, options)
-        if (!result) return
-        streamingContent.value = result.content
-        onChunk?.(result.content)
-      } else {
-        await provider.chatStream({ messages, ...options }, (chunk) => {
-          if (chunk.content) {
-            streamingContent.value += chunk.content
-            onChunk?.(chunk.content)
-          }
-        })
-      }
+      streamingContent.value = result.content
+      onChunk?.(result.content)
 
       if (!streamingContent.value.trim()) {
         throw new Error(
