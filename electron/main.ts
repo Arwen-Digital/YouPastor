@@ -51,6 +51,18 @@ app.setName('YouPastor')
 let win: BrowserWindow | null
 let pendingDeepLink: string | null = null
 let isUpdateReady = false
+let updateStatus: 'idle' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error' = 'idle'
+let updateProgress = 0
+let updateError: string | null = null
+
+function emitUpdateState() {
+  win?.webContents.send('app:update-state', {
+    status: updateStatus,
+    progress: updateProgress,
+    ready: isUpdateReady,
+    error: updateError,
+  })
+}
 
 function getDeepLinkRoute(url: string): string | null {
   try {
@@ -100,19 +112,39 @@ function setupAutoUpdater() {
 
   autoUpdater.on('update-available', () => {
     console.log('Update available. Downloading...')
+    updateStatus = 'available'
+    updateProgress = 0
+    updateError = null
+    emitUpdateState()
+  })
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    updateStatus = 'downloading'
+    updateProgress = Math.max(0, Math.min(100, Math.round(progressObj.percent || 0)))
+    emitUpdateState()
   })
 
   autoUpdater.on('update-not-available', () => {
     console.log('No update available.')
+    updateStatus = 'idle'
+    updateProgress = 0
+    updateError = null
+    emitUpdateState()
   })
 
   autoUpdater.on('error', (error) => {
     console.error('Auto-update error:', error)
+    updateStatus = 'error'
+    updateError = error?.message ?? String(error)
+    emitUpdateState()
   })
 
   autoUpdater.on('update-downloaded', () => {
     isUpdateReady = true
-    win?.webContents.send('app:update-downloaded')
+    updateStatus = 'downloaded'
+    updateProgress = 100
+    updateError = null
+    emitUpdateState()
   })
 
   void autoUpdater.checkForUpdates()
@@ -141,9 +173,7 @@ function createWindow() {
 
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
-    if (isUpdateReady) {
-      win?.webContents.send('app:update-downloaded')
-    }
+    emitUpdateState()
     if (pendingDeepLink) {
       const deepLink = pendingDeepLink
       pendingDeepLink = null
@@ -213,15 +243,34 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('app:installUpdate', async () => {
-    if (!isUpdateReady) return false
+    if (!isUpdateReady) return { ok: false, reason: 'not-ready' }
+
+    updateStatus = 'installing'
+    emitUpdateState()
+
+    setTimeout(() => {
+      app.quit()
+    }, 1800)
+
     setImmediate(() => {
-      autoUpdater.quitAndInstall(false, true)
+      try {
+        autoUpdater.quitAndInstall(false, true)
+      } catch (err) {
+        console.error('[update] quitAndInstall failed, falling back to app.quit()', err)
+        app.quit()
+      }
     })
-    return true
+
+    return { ok: true }
   })
 
-  ipcMain.handle('app:isUpdateReady', async () => {
-    return isUpdateReady
+  ipcMain.handle('app:getUpdateState', async () => {
+    return {
+      status: updateStatus,
+      progress: updateProgress,
+      ready: isUpdateReady,
+      error: updateError,
+    }
   })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

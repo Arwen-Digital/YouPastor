@@ -33,7 +33,26 @@ const LOW_CREDIT_THRESHOLD = 20
 const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
 const showLowCreditNotice = computed(() => !!auth.user && creditBalance.value <= LOW_CREDIT_THRESHOLD)
 const isAdminUser = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
-const updateReady = ref(false)
+const updateStatus = ref<'idle' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error'>('idle')
+const updateProgress = ref(0)
+const updateError = ref<string | null>(null)
+const updateBadgeVisible = computed(() => updateStatus.value !== 'idle')
+const updateActionable = computed(() => updateStatus.value === 'downloaded')
+const updateTitle = computed(() => {
+  if (updateStatus.value === 'available' || updateStatus.value === 'downloading') return 'Downloading update...'
+  if (updateStatus.value === 'downloaded') return 'Update available'
+  if (updateStatus.value === 'installing') return 'Installing update...'
+  if (updateStatus.value === 'error') return 'Update failed'
+  return ''
+})
+const updateSubtitle = computed(() => {
+  if (updateStatus.value === 'available') return 'Preparing download'
+  if (updateStatus.value === 'downloading') return `${updateProgress.value}% downloaded`
+  if (updateStatus.value === 'downloaded') return 'Click to restart and install'
+  if (updateStatus.value === 'installing') return 'Restarting YouPastor...'
+  if (updateStatus.value === 'error') return updateError.value ?? 'Could not restart automatically. Please quit and reopen YouPastor.'
+  return ''
+})
 const lowCreditProgress = computed(() => {
   const pct = (creditBalance.value / LOW_CREDIT_THRESHOLD) * 100
   return Math.max(0, Math.min(100, pct))
@@ -115,28 +134,48 @@ function navigateTo(path: string) {
 }
 
 async function installUpdateNow() {
+  if (updateStatus.value !== 'downloaded') return
+
   try {
-    await window.appLinks?.installUpdate?.()
+    const result = await window.appLinks?.installUpdate?.()
+    if (!result?.ok) {
+      updateStatus.value = 'error'
+      updateError.value = 'Could not restart automatically. Please quit and reopen YouPastor.'
+      return
+    }
+
+    updateStatus.value = 'installing'
   } catch (err) {
     console.warn('[update] Failed to start update install', err)
+    updateStatus.value = 'error'
+    updateError.value = 'Could not restart automatically. Please quit and reopen YouPastor.'
   }
 }
 
-function onUpdateDownloaded() {
-  updateReady.value = true
+function applyUpdateState(payload: any) {
+  if (!payload) return
+  updateStatus.value = payload.status ?? 'idle'
+  updateProgress.value = Number(payload.progress ?? 0)
+  updateError.value = payload.error ?? null
+}
+
+const onUpdateState = (_event: any, payload: any) => {
+  applyUpdateState(payload)
 }
 
 onMounted(async () => {
-  window.ipcRenderer?.on('app:update-downloaded', onUpdateDownloaded)
+  window.ipcRenderer?.on('app:update-state', onUpdateState)
+
   try {
-    updateReady.value = (await window.appLinks?.isUpdateReady?.()) ?? false
+    const state = await window.appLinks?.getUpdateState?.()
+    applyUpdateState(state)
   } catch {
     // no-op
   }
 })
 
 onUnmounted(() => {
-  window.ipcRenderer?.off('app:update-downloaded', onUpdateDownloaded)
+  window.ipcRenderer?.off('app:update-state', onUpdateState)
 })
 </script>
 
@@ -208,12 +247,18 @@ onUnmounted(() => {
         <div class="mx-3 h-px bg-border mb-2" />
 
         <button
-          v-if="updateReady"
+          v-if="updateBadgeVisible"
           @click="installUpdateNow"
-          class="mx-1 mb-2 w-full rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-left hover:bg-amber-100 transition-colors"
+          :disabled="!updateActionable"
+          :class="[
+            'mx-1 mb-2 w-full rounded-xl border px-3 py-2 text-left transition-colors',
+            updateActionable
+              ? 'border-amber-300/60 bg-amber-50 hover:bg-amber-100'
+              : 'border-amber-200/50 bg-amber-50/60 cursor-default',
+          ]"
         >
-          <div class="text-xs font-semibold text-amber-900">Update available</div>
-          <div class="text-[11px] text-amber-800/90">Click to restart and install</div>
+          <div class="text-xs font-semibold text-amber-900">{{ updateTitle }}</div>
+          <div class="text-[11px] text-amber-800/90">{{ updateSubtitle }}</div>
         </button>
 
         <div v-if="showLowCreditNotice" class="mx-1 mb-2 rounded-2xl border border-border bg-card p-3 shadow-sm space-y-2">
