@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -33,6 +33,7 @@ const LOW_CREDIT_THRESHOLD = 20
 const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
 const showLowCreditNotice = computed(() => !!auth.user && creditBalance.value <= LOW_CREDIT_THRESHOLD)
 const isAdminUser = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
+const updateReady = ref(false)
 const lowCreditProgress = computed(() => {
   const pct = (creditBalance.value / LOW_CREDIT_THRESHOLD) * 100
   return Math.max(0, Math.min(100, pct))
@@ -112,6 +113,31 @@ const workspaceSections: NavItem[] = [
 function navigateTo(path: string) {
   router.push(path)
 }
+
+async function installUpdateNow() {
+  try {
+    await window.appLinks?.installUpdate?.()
+  } catch (err) {
+    console.warn('[update] Failed to start update install', err)
+  }
+}
+
+function onUpdateDownloaded() {
+  updateReady.value = true
+}
+
+onMounted(async () => {
+  window.ipcRenderer?.on('app:update-downloaded', onUpdateDownloaded)
+  try {
+    updateReady.value = (await window.appLinks?.isUpdateReady?.()) ?? false
+  } catch {
+    // no-op
+  }
+})
+
+onUnmounted(() => {
+  window.ipcRenderer?.off('app:update-downloaded', onUpdateDownloaded)
+})
 </script>
 
 <template>
@@ -180,6 +206,15 @@ function navigateTo(path: string) {
 
       <div class="px-3 pb-3 pt-2 space-y-1">
         <div class="mx-3 h-px bg-border mb-2" />
+
+        <button
+          v-if="updateReady"
+          @click="installUpdateNow"
+          class="mx-1 mb-2 w-full rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-left hover:bg-amber-100 transition-colors"
+        >
+          <div class="text-xs font-semibold text-amber-900">Update available</div>
+          <div class="text-[11px] text-amber-800/90">Click to restart and install</div>
+        </button>
 
         <div v-if="showLowCreditNotice" class="mx-1 mb-2 rounded-2xl border border-border bg-card p-3 shadow-sm space-y-2">
           <div class="text-sm font-medium text-foreground">{{ creditBalance }} credits remaining</div>

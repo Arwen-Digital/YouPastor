@@ -31,4 +31,6 @@ contextBridge.exposeInMainWorld('secretStore', {
 contextBridge.exposeInMainWorld('appLinks', {
   openExternal: (url: string) => ipcRenderer.invoke('external:open', url),
   startCallbackServer: (): Promise<number> => ipcRenderer.invoke('auth:startCallbackServer'),
+  installUpdate: (): Promise<boolean> => ipcRenderer.invoke('app:installUpdate'),
+  isUpdateReady: (): Promise<boolean> => ipcRenderer.invoke('app:isUpdateReady'),
 })

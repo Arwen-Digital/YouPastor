@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell, ipcMain, nativeImage, dialog } from 'electron'
+import { app, BrowserWindow, session, shell, ipcMain, nativeImage } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -50,6 +50,7 @@ app.setName('YouPastor')
 
 let win: BrowserWindow | null
 let pendingDeepLink: string | null = null
+let isUpdateReady = false
 
 function getDeepLinkRoute(url: string): string | null {
   try {
@@ -109,20 +110,9 @@ function setupAutoUpdater() {
     console.error('Auto-update error:', error)
   })
 
-  autoUpdater.on('update-downloaded', async () => {
-    const result = await dialog.showMessageBox({
-      type: 'info',
-      title: 'Update Ready',
-      message: 'A new version of YouPastor has been downloaded.',
-      detail: 'Restart YouPastor to install the update.',
-      buttons: ['Restart now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    })
-
-    if (result.response === 0) {
-      autoUpdater.quitAndInstall()
-    }
+  autoUpdater.on('update-downloaded', () => {
+    isUpdateReady = true
+    win?.webContents.send('app:update-downloaded')
   })
 
   void autoUpdater.checkForUpdates()
@@ -151,6 +141,9 @@ function createWindow() {
 
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
+    if (isUpdateReady) {
+      win?.webContents.send('app:update-downloaded')
+    }
     if (pendingDeepLink) {
       const deepLink = pendingDeepLink
       pendingDeepLink = null
@@ -217,6 +210,18 @@ app.whenReady().then(() => {
   // IPC: start local callback server, return the port so renderer can pass it as redirectTo to Convex
   ipcMain.handle('auth:startCallbackServer', async () => {
     return startCallbackServer()
+  })
+
+  ipcMain.handle('app:installUpdate', async () => {
+    if (!isUpdateReady) return false
+    setImmediate(() => {
+      autoUpdater.quitAndInstall(false, true)
+    })
+    return true
+  })
+
+  ipcMain.handle('app:isUpdateReady', async () => {
+    return isUpdateReady
   })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

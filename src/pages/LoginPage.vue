@@ -15,6 +15,7 @@ const name = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const googleAuthEnabled = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true'
+const appVersion = __APP_VERSION__
 
 const localError = ref('')
 const touched = ref(false)
@@ -115,7 +116,7 @@ function switchMode(newMode: 'signin' | 'signup') {
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-background">
+  <div class="relative flex min-h-screen bg-background">
     <!-- Left panel — branding -->
     <div class="hidden lg:flex lg:w-[45%] xl:w-[40%] flex-col justify-between bg-muted/40 border-r border-border p-10">
       <div>
@@ -381,6 +382,10 @@ function switchMode(newMode: 'signin' | 'signup') {
           <a href="#" class="underline underline-offset-2 hover:text-foreground transition-colors">Privacy Policy</a>.
         </p>
       </div>
+    </div>
+
+    <div class="pointer-events-none absolute bottom-3 left-3 text-[10px] text-muted-foreground/80">
+      v{{ appVersion }}
     </div>
   </div>
 </template>

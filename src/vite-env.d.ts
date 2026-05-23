@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __APP_VERSION__: string
+
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
   const component: DefineComponent<object, object, unknown>
@@ -14,5 +16,8 @@ declare module '*?raw' {
 interface Window {
   appLinks?: {
     openExternal: (url: string) => Promise<boolean>
+    startCallbackServer: () => Promise<number>
+    installUpdate: () => Promise<boolean>
+    isUpdateReady: () => Promise<boolean>
   }
 }
