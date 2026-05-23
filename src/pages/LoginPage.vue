@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Mail, Lock, User, Eye, EyeOff, Church, Loader2, AlertCircle, Sparkles } from 'lucide-vue-next'
+import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, Sparkles } from 'lucide-vue-next'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -120,9 +120,7 @@ function switchMode(newMode: 'signin' | 'signup') {
     <div class="hidden lg:flex lg:w-[45%] xl:w-[40%] flex-col justify-between bg-muted/40 border-r border-border p-10">
       <div>
         <div class="flex items-center gap-2.5">
-          <div class="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-            <Church class="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/icon.png" alt="YouPastor" class="h-9 w-9 rounded-lg object-cover" />
           <span class="text-xl font-semibold tracking-tight text-foreground">YouPastor</span>
         </div>
       </div>
@@ -173,9 +171,7 @@ function switchMode(newMode: 'signin' | 'signup') {
       <div class="w-full max-w-sm space-y-6">
         <!-- Mobile logo -->
         <div class="lg:hidden flex items-center justify-center gap-2.5 mb-2">
-          <div class="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-            <Church class="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/icon.png" alt="YouPastor" class="h-9 w-9 rounded-lg object-cover" />
           <span class="text-xl font-semibold tracking-tight text-foreground">YouPastor</span>
         </div>
 

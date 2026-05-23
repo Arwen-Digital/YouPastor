@@ -1,13 +1,14 @@
 {
   "name": "youpastor",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "productName": "YouPastor",
   "description": "Desktop-first AI Workspace for pastors",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build && electron-builder",
+    "publish": "vue-tsc && vite build && electron-builder --publish always",
     "preview": "vite preview",
     "convex:dev": "convex dev",
     "seed:skills": "node scripts/seed-skills.mjs",
@@ -22,6 +23,7 @@
     "clsx": "^2.1.1",
     "convex": "^1.39.1",
     "dexie": "^4.4.2",
+    "electron-updater": "^6.8.3",
     "lucide-vue-next": "^1.0.0",
     "marked": "^18.0.3",
     "pinia": "^3.0.4",

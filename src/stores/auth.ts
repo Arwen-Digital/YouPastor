@@ -424,29 +424,47 @@ async function retry<T>(
 
 function parseAuthError(err: any): string {
   const message = err?.message ?? err?.data?.message ?? String(err)
+  const raw = [
+    message,
+    err?.data?.message,
+    err?.cause?.message,
+    JSON.stringify(err?.data ?? ''),
+  ]
+    .filter(Boolean)
+    .join(' | ')
 
-  if (message.includes('Invalid password') || message.includes('Invalid credentials') || message.includes('InvalidSecret')) {
+  const normalized = raw
+    .replace(/\[CONVEX[^\]]*\]/g, ' ')
+    .replace(/\bCalled by client\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (normalized.includes('Invalid password') || normalized.includes('Invalid credentials') || normalized.includes('InvalidSecret')) {
     return 'Incorrect password. Please try again.'
   }
-  if (message.includes('User not found') || message.includes('No account found') || message.includes('InvalidAccountId')) {
+  if (normalized.includes('User not found') || normalized.includes('No account found') || normalized.includes('InvalidAccountId')) {
     return 'No account found with this email. Try signing up instead.'
   }
-  if (message.includes('already exists') || message.includes('already registered') || message.includes('Account already exists')) {
+  if (normalized.includes('already exists') || normalized.includes('already registered') || normalized.includes('Account already exists')) {
     return 'An account with this email already exists. Try signing in instead.'
   }
-  if (message.includes('too short') || message.includes('at least')) {
+  if (normalized.includes('too short') || normalized.includes('at least')) {
     return 'Password must be at least 8 characters.'
   }
-  if (message.includes('Invalid email')) {
+  if (normalized.includes('Invalid email')) {
     return 'Please enter a valid email address.'
   }
-  if (message.includes('No auth token')) {
+  if (normalized.includes('No auth token')) {
     return 'Authentication failed. Please try again.'
   }
-  // Show generic error with the actual message for debugging
-  if (message.includes('timed out')) {
+  if (normalized.includes('timed out')) {
     return 'Connection timed out. Make sure `npx convex dev` is running.'
   }
 
-  return message || 'Something went wrong. Please try again.'
+  // Convex production can mask auth provider failures as "Server Error ... Called by client".
+  if (normalized.includes('auth:signIn') && normalized.includes('Server Error')) {
+    return 'No account found with this email. Try signing up instead.'
+  }
+
+  return normalized || 'Something went wrong. Please try again.'
 }

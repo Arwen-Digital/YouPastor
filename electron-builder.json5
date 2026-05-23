@@ -4,6 +4,14 @@
   "appId": "com.youpastor.app",
   "asar": true,
   "productName": "YouPastor",
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "Arwen-Digital",
+      "repo": "YouPastor",
+      "releaseType": "release"
+    }
+  ],
   "protocols": [
     {
       "name": "YouPastor",
@@ -22,7 +30,8 @@
   "mac": {
     "icon": "build/icons/icon.icns",
     "target": [
-      "dmg"
+      "dmg",
+      "zip"
     ],
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },

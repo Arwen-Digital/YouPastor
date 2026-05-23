@@ -1,4 +1,5 @@
-import { app, BrowserWindow, session, shell, ipcMain, nativeImage } from 'electron'
+import { app, BrowserWindow, session, shell, ipcMain, nativeImage, dialog } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import http from 'node:http'
@@ -88,6 +89,43 @@ function emitDeepLink(url: string) {
 
 function extractDeepLink(argv: string[]): string | null {
   return argv.find((arg) => arg.startsWith('youpastor://')) ?? null
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return
+
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', () => {
+    console.log('Update available. Downloading...')
+  })
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('No update available.')
+  })
+
+  autoUpdater.on('error', (error) => {
+    console.error('Auto-update error:', error)
+  })
+
+  autoUpdater.on('update-downloaded', async () => {
+    const result = await dialog.showMessageBox({
+      type: 'info',
+      title: 'Update Ready',
+      message: 'A new version of YouPastor has been downloaded.',
+      detail: 'Restart YouPastor to install the update.',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall()
+    }
+  })
+
+  void autoUpdater.checkForUpdates()
 }
 
 function createWindow() {
@@ -194,6 +232,7 @@ app.whenReady().then(() => {
 
   registerIpcHandlers()
   createWindow()
+  setupAutoUpdater()
 })
 
 app.on('before-quit', () => {
