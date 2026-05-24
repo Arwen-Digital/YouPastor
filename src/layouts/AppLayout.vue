@@ -33,24 +33,18 @@ const LOW_CREDIT_THRESHOLD = 20
 const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
 const showLowCreditNotice = computed(() => !!auth.user && creditBalance.value <= LOW_CREDIT_THRESHOLD)
 const isAdminUser = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
-const updateStatus = ref<'idle' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error'>('idle')
-const updateProgress = ref(0)
+const updateStatus = ref<'idle' | 'available' | 'error'>('idle')
 const updateError = ref<string | null>(null)
-const updateBadgeVisible = computed(() => updateStatus.value !== 'idle')
-const updateActionable = computed(() => updateStatus.value === 'downloaded')
+const updateBadgeVisible = computed(() => updateStatus.value === 'available' || updateStatus.value === 'error')
+const updateActionable = computed(() => updateStatus.value === 'available')
 const updateTitle = computed(() => {
-  if (updateStatus.value === 'available' || updateStatus.value === 'downloading') return 'Downloading update...'
-  if (updateStatus.value === 'downloaded') return 'Update available'
-  if (updateStatus.value === 'installing') return 'Installing update...'
-  if (updateStatus.value === 'error') return 'Update failed'
+  if (updateStatus.value === 'available') return 'Update available'
+  if (updateStatus.value === 'error') return 'Update check failed'
   return ''
 })
 const updateSubtitle = computed(() => {
-  if (updateStatus.value === 'available') return 'Preparing download'
-  if (updateStatus.value === 'downloading') return `${updateProgress.value}% downloaded`
-  if (updateStatus.value === 'downloaded') return 'Click to restart and install'
-  if (updateStatus.value === 'installing') return 'Restarting YouPastor...'
-  if (updateStatus.value === 'error') return updateError.value ?? 'Could not restart automatically. Please quit and reopen YouPastor.'
+  if (updateStatus.value === 'available') return 'Click here to download'
+  if (updateStatus.value === 'error') return updateError.value ?? 'Please try again later.'
   return ''
 })
 const lowCreditProgress = computed(() => {
@@ -134,28 +128,26 @@ function navigateTo(path: string) {
 }
 
 async function installUpdateNow() {
-  if (updateStatus.value !== 'downloaded') return
+  if (updateStatus.value !== 'available') return
+
+  const ua = navigator.userAgent.toLowerCase()
+  const isWindows = ua.includes('win')
+  const downloadUrl = isWindows
+    ? 'https://youpastor.com/download?platform=windows'
+    : 'https://youpastor.com/download?platform=mac'
 
   try {
-    const result = await window.appLinks?.installUpdate?.()
-    if (!result?.ok) {
-      updateStatus.value = 'error'
-      updateError.value = 'Could not restart automatically. Please quit and reopen YouPastor.'
-      return
-    }
-
-    updateStatus.value = 'installing'
+    await window.appLinks?.openExternal(downloadUrl)
   } catch (err) {
-    console.warn('[update] Failed to start update install', err)
+    console.warn('[update] Failed to open download link', err)
     updateStatus.value = 'error'
-    updateError.value = 'Could not restart automatically. Please quit and reopen YouPastor.'
+    updateError.value = 'Could not open download link. Please visit youpastor.com/download.'
   }
 }
 
 function applyUpdateState(payload: any) {
   if (!payload) return
   updateStatus.value = payload.status ?? 'idle'
-  updateProgress.value = Number(payload.progress ?? 0)
   updateError.value = payload.error ?? null
 }
 
@@ -253,7 +245,7 @@ onUnmounted(() => {
           :class="[
             'mx-1 mb-2 w-full rounded-xl border px-3 py-2 text-left transition-colors',
             updateActionable
-              ? 'border-amber-300/60 bg-amber-50 hover:bg-amber-100'
+              ? 'border-amber-300/60 bg-amber-50 hover:bg-amber-100 cursor-pointer'
               : 'border-amber-200/50 bg-amber-50/60 cursor-default',
           ]"
         >

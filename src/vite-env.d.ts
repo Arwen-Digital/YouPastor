@@ -17,11 +17,9 @@ interface Window {
   appLinks?: {
     openExternal: (url: string) => Promise<boolean>
     startCallbackServer: () => Promise<number>
-    installUpdate: () => Promise<{ ok: boolean; reason?: string }>
     getUpdateState: () => Promise<{
-      status: 'idle' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error'
+      status: 'idle' | 'available' | 'error'
       progress: number
-      ready: boolean
       error: string | null
     }>
   }

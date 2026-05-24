@@ -465,8 +465,8 @@ const canSave = computed(() => {
   const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
   const isGenericContentSkill = isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter || isSermonToBlog
   // Hard fallback so Save can't get stuck inactive if model never emits SKILL_READY.
-  const intakeBypassThreshold = isSermonToBlog ? 3 : 4
-  const intakeBypass = isGenericContentSkill && assistantMsgs >= intakeBypassThreshold
+  const intakeBypassThreshold = isSeriesPlanner ? 6 : isSermonToBlog ? 3 : 4
+  const intakeBypass = (isGenericContentSkill || isSeriesPlanner) && assistantMsgs >= intakeBypassThreshold
   if (isIntakePhase.value && !intakeBypass) return false
 
   const status = isSeriesPlanner ? seriesSaveStatus.value
@@ -696,9 +696,9 @@ async function handleAssistantResponse(responseContent: string) {
   }
 
   // Safety fallback: after enough assistant turns, don't block Save behind intake state.
-  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter || isSermonToBlog) && isIntakePhase.value) {
+  if ((isChurchSocialPost || isSocialMediaCalendar || isChurchEmail || isAnnouncementScript || isChurchLetter || isSermonToBlog || isSeriesPlanner) && isIntakePhase.value) {
     const assistantMsgs = messages.value.filter(m => m.role === 'assistant').length
-    const fallbackThreshold = isSermonToBlog ? 3 : 4
+    const fallbackThreshold = isSeriesPlanner ? 6 : isSermonToBlog ? 3 : 4
     if (assistantMsgs >= fallbackThreshold) {
       isIntakePhase.value = false
       setRole('generator')
