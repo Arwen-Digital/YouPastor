@@ -92,9 +92,9 @@ const workspaceSections: NavItem[] = [
     section: 'sermon-prep',
     children: [
       { label: 'Series Planner', icon: Layers, path: '/series' },
-      { label: 'Research', icon: ResearchIcon, path: '/research' },
       { label: 'Brainstorm', icon: Lightbulb, path: '/brainstorm' },
-      { label: 'Create Sermons', icon: BookOpen, path: '/sermons' },
+      { label: 'Research', icon: ResearchIcon, path: '/research' },
+      { label: 'Create a Sermon', icon: BookOpen, path: '/sermons' },
     ],
   },
   {
