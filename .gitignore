@@ -47,6 +47,7 @@ docker-compose*.yml
 # Local scripts
 scripts/
 scripts/publish-release.local.sh
+scripts/internal-build-release.sh
 
 # Release output
 release/
