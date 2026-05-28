@@ -28,17 +28,25 @@
         border-radius: 10px;
       }
 
-      .boot-loader__spinner {
-        width: 28px;
-        height: 28px;
-        border: 3px solid rgba(0, 0, 0, 0.15);
-        border-top-color: rgba(0, 0, 0, 0.7);
-        border-radius: 9999px;
-        animation: boot-spin 0.85s linear infinite;
+      .boot-loader__dots {
+        display: flex;
+        gap: 6px;
       }
 
-      @keyframes boot-spin {
-        to { transform: rotate(360deg); }
+      .boot-loader__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 9999px;
+        background: rgba(0, 0, 0, 0.7);
+        animation: boot-dot 1s ease-in-out infinite;
+      }
+
+      .boot-loader__dot:nth-child(2) { animation-delay: 0.15s; }
+      .boot-loader__dot:nth-child(3) { animation-delay: 0.3s; }
+
+      @keyframes boot-dot {
+        0%, 80%, 100% { transform: scale(0.65); opacity: 0.35; }
+        40% { transform: scale(1); opacity: 1; }
       }
     </style>
     <title>YouPastor</title>
@@ -47,7 +55,11 @@
     <div id="app">
       <div class="boot-loader" aria-label="Loading app" role="status">
         <img src="/icon.png" alt="" class="boot-loader__logo" />
-        <div class="boot-loader__spinner" aria-hidden="true"></div>
+        <div class="boot-loader__dots" aria-hidden="true">
+          <span class="boot-loader__dot"></span>
+          <span class="boot-loader__dot"></span>
+          <span class="boot-loader__dot"></span>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

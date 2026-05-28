@@ -28,6 +28,7 @@ marked.setOptions({ breaks: true, gfm: true })
 
 const route = useRoute()
 const router = useRouter()
+const isMacDesktop = computed(() => !!window.ipcRenderer && /mac/i.test(navigator.userAgent))
 
 const action = computed(() => route.params.action as 'create' | 'edit')
 const mode = computed(() => route.params.mode as 'series' | 'standalone' | 'sermon')
@@ -400,7 +401,7 @@ async function handleSave() {
 
     <!-- Editor workspace -->
     <div v-else class="h-full flex flex-col">
-      <header class="shrink-0 border-b border-border bg-background px-5 py-3">
+      <header :class="['shrink-0 border-b border-border bg-background px-5 py-3', isMacDesktop ? 'pl-20' : '']">
         <div class="flex items-center justify-between gap-4">
           <div class="flex items-center gap-3 min-w-0">
             <button
