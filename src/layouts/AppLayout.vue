@@ -52,6 +52,9 @@ const lowCreditProgress = computed(() => {
   return Math.max(0, Math.min(100, pct))
 })
 
+const isDesktopApp = computed(() => !!window.ipcRenderer)
+const showSidebarDragRegion = computed(() => isDesktopApp.value && /mac/i.test(navigator.userAgent))
+
 async function handleSignOut() {
   await auth.signOut()
   router.push('/login')
@@ -175,6 +178,7 @@ onUnmounted(() => {
   <div class="flex h-screen bg-background">
     <transition name="sidebar-slide">
       <aside v-if="!hideSidebar" class="w-[260px] flex flex-col bg-muted/50 shrink-0">
+      <div v-if="showSidebarDragRegion" class="sidebar-drag-region" />
       <div class="px-3 pt-3 pb-2">
         <button
           v-for="item in topNav"
@@ -314,7 +318,8 @@ onUnmounted(() => {
       </aside>
     </transition>
 
-    <main class="flex-1 overflow-hidden transition-all duration-300">
+    <main class="flex-1 overflow-hidden transition-all duration-300 relative">
+      <div v-if="showSidebarDragRegion" class="main-drag-region" />
       <router-view v-slot="{ Component }">
         <transition
           name="page-slide"
@@ -328,6 +333,21 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.sidebar-drag-region {
+  height: 32px;
+  -webkit-app-region: drag;
+}
+
+.main-drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  z-index: 10;
+  -webkit-app-region: drag;
+}
+
 .sidebar-slide-enter-active,
 .sidebar-slide-leave-active {
   transition: width 220ms ease, opacity 180ms ease, transform 220ms ease;

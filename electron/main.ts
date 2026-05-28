@@ -139,6 +139,7 @@ function createWindow() {
   win = new BrowserWindow({
     icon: appIconPath,
     title: 'YouPastor',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
     width: 1280,
     height: 800,
     minWidth: 900,
