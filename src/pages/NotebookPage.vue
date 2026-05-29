@@ -209,6 +209,7 @@ const pastoralFilter = ref<'all' | 'devotional' | 'agenda'>('all')
 // ── Deleting ──
 const deletingId = ref<string | null>(null)
 const exportingResearchPdf = ref(false)
+const exportingBrainstormPdf = ref(false)
 
 onMounted(async () => {
   try {
@@ -838,12 +839,235 @@ async function downloadResearchPdf() {
     drawText('Generated through YouPastor (https://youpastor.com)', { size: 10, gapAfter: 0 })
 
     const datePart = new Date().toISOString().slice(0, 10)
-    const filename = `${slugifyFilePart(title)}-${datePart}.pdf`
+    const filename = `research-${slugifyFilePart(title)}-${datePart}.pdf`
     pdf.save(filename)
   } catch (err) {
     console.error('Failed to generate research PDF:', err)
   } finally {
     exportingResearchPdf.value = false
+  }
+}
+
+async function downloadBrainstormPdf() {
+  if (!brainstormDetail.value || !brainstormDetail.value.content || exportingBrainstormPdf.value) return
+
+  exportingBrainstormPdf.value = true
+  try {
+    const { jsPDF } = await import('jspdf')
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 48
+    const maxWidth = pageWidth - margin * 2
+    let y = margin
+
+    const ensureSpace = (heightNeeded: number) => {
+      if (y + heightNeeded > pageHeight - margin) {
+        pdf.addPage()
+        y = margin
+      }
+    }
+
+    const cleanInline = (line: string): string => line
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '[image]')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+      .replace(/`([^`]+)`/g, '$1')
+      .trim()
+
+    const drawText = (text: string, options?: { size?: number; bold?: boolean; indent?: number; gapAfter?: number }) => {
+      const size = options?.size ?? 11
+      const indent = options?.indent ?? 0
+      const gapAfter = options?.gapAfter ?? 6
+      const x = margin + indent
+      const width = maxWidth - indent
+      const lines = pdf.splitTextToSize(cleanInline(text), width)
+      const lineHeight = Math.max(14, size * 1.35)
+      const blockHeight = lines.length * lineHeight
+
+      ensureSpace(blockHeight)
+      pdf.setFont('helvetica', options?.bold ? 'bold' : 'normal')
+      pdf.setFontSize(size)
+      pdf.text(lines, x, y)
+      y += blockHeight + gapAfter
+    }
+
+    const drawRichLine = (line: string, options?: { size?: number; indent?: number; gapAfter?: number }) => {
+      const size = options?.size ?? 11
+      const indent = options?.indent ?? 0
+      const gapAfter = options?.gapAfter ?? 5
+      const lineHeight = Math.max(14, size * 1.35)
+      const maxX = margin + maxWidth
+      let x = margin + indent
+
+      const normalized = cleanInline(line)
+      const segments = normalized
+        .split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g)
+        .filter(Boolean)
+        .map((seg) => {
+          const isBold = /^\*\*[^*]+\*\*$/.test(seg) || /^__[^_]+__$/.test(seg)
+          const isItalic = /^\*[^*]+\*$/.test(seg) || /^_[^_]+_$/.test(seg)
+          const text = isBold ? seg.slice(2, -2) : isItalic ? seg.slice(1, -1) : seg
+          return { text, isBold, isItalic }
+        })
+
+      ensureSpace(lineHeight)
+      pdf.setFontSize(size)
+
+      for (const segment of segments) {
+        const words = segment.text.split(/(\s+)/)
+        const fontStyle = segment.isBold ? (segment.isItalic ? 'bolditalic' : 'bold') : (segment.isItalic ? 'italic' : 'normal')
+        pdf.setFont('helvetica', fontStyle)
+        for (const token of words) {
+          if (!token) continue
+          const w = pdf.getTextWidth(token)
+          if (x + w > maxX && token.trim()) {
+            y += lineHeight
+            ensureSpace(lineHeight)
+            x = margin + indent
+          }
+          pdf.text(token, x, y)
+          x += w
+        }
+      }
+
+      y += lineHeight + gapAfter
+    }
+
+    const parseTableRow = (line: string): string[] => {
+      const inner = line.trim().replace(/^\|/, '').replace(/\|$/, '')
+      return inner.split('|').map((cell) => cleanInline(cell.trim()))
+    }
+
+    const drawTable = (rows: string[][]) => {
+      if (!rows.length) return
+      const colCount = Math.max(...rows.map((r) => r.length), 1)
+      const colWidth = maxWidth / colCount
+      const cellPadding = 6
+      const lineHeight = 13
+
+      rows.forEach((row, rowIdx) => {
+        const normalized = Array.from({ length: colCount }, (_, i) => row[i] ?? '')
+        const cellLines = normalized.map((cell) => pdf.splitTextToSize(cell, colWidth - cellPadding * 2))
+        const maxLines = Math.max(...cellLines.map((lines: string[]) => lines.length), 1)
+        const rowHeight = maxLines * lineHeight + cellPadding * 2
+
+        ensureSpace(rowHeight + 1)
+
+        if (rowIdx === 0) {
+          pdf.setFillColor(245, 245, 245)
+          pdf.rect(margin, y, maxWidth, rowHeight, 'F')
+        }
+
+        normalized.forEach((_cell, colIdx) => {
+          const x = margin + colIdx * colWidth
+          pdf.setDrawColor(210, 210, 210)
+          pdf.rect(x, y, colWidth, rowHeight)
+
+          pdf.setFont('helvetica', rowIdx === 0 ? 'bold' : 'normal')
+          pdf.setFontSize(10)
+          pdf.text(cellLines[colIdx], x + cellPadding, y + cellPadding + 10)
+        })
+
+        y += rowHeight
+      })
+
+      y += 8
+    }
+
+    const title = brainstormDetail.value.passage || 'Brainstorm Note'
+    drawText(title, { size: 18, bold: true, gapAfter: 8 })
+
+    if (brainstormDetail.value.bigIdea) {
+      drawText(brainstormDetail.value.bigIdea, { size: 12, gapAfter: 8 })
+    }
+
+    const linkedSeries = brainstormDetail.value.seriesId ? getSeriesName(brainstormDetail.value.seriesId) : ''
+    const meta = [
+      brainstormDetail.value.createdAt ? `Created ${formatDate(brainstormDetail.value.createdAt)}` : '',
+      linkedSeries ? `Series: ${linkedSeries}` : '',
+    ].filter(Boolean).join(' • ')
+
+    if (meta) drawText(meta, { size: 10, gapAfter: 10 })
+
+    ensureSpace(12)
+    pdf.setDrawColor(220, 220, 220)
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 16
+
+    const lines = String(brainstormDetail.value.content || '').replace(/\r\n/g, '\n').split('\n')
+    let inCodeBlock = false
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? ''
+
+      if (/^```/.test(line.trim())) {
+        inCodeBlock = !inCodeBlock
+        continue
+      }
+      if (inCodeBlock) {
+        drawText(line || ' ', { size: 10, indent: 12, gapAfter: 2 })
+        continue
+      }
+      if (!line.trim()) {
+        y += 4
+        continue
+      }
+
+      if (line.includes('|') && i + 1 < lines.length && /^\s*\|?\s*[:\-]+/.test(lines[i + 1] || '')) {
+        const tableLines = [line]
+        i += 2
+        while (i < lines.length && lines[i].includes('|') && lines[i].trim()) {
+          tableLines.push(lines[i])
+          i++
+        }
+        i -= 1
+        drawTable(tableLines.map(parseTableRow))
+        continue
+      }
+
+      const heading = line.match(/^(#{1,6})\s+(.+)$/)
+      if (heading) {
+        const level = heading[1].length
+        const sizeByLevel = [0, 17, 15, 14, 13, 12, 11]
+        drawText(heading[2], { size: sizeByLevel[level] || 11, bold: true, gapAfter: 6 })
+        continue
+      }
+
+      const quote = line.match(/^>\s+(.+)$/)
+      if (quote) {
+        drawRichLine(`"${quote[1]}"`, { size: 11, indent: 10, gapAfter: 6 })
+        continue
+      }
+
+      const ordered = line.match(/^\s*\d+\.\s+(.+)$/)
+      if (ordered) {
+        drawRichLine(line.trim(), { size: 11, indent: 12, gapAfter: 4 })
+        continue
+      }
+
+      const bullet = line.match(/^\s*[-*+]\s+(.+)$/)
+      if (bullet) {
+        drawRichLine(`• ${bullet[1]}`, { size: 11, indent: 12, gapAfter: 4 })
+        continue
+      }
+
+      drawRichLine(line, { size: 11, gapAfter: 5 })
+    }
+
+    y += 8
+    ensureSpace(18)
+    pdf.setDrawColor(220, 220, 220)
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 12
+    drawText('Generated through YouPastor (https://youpastor.com)', { size: 10, gapAfter: 0 })
+
+    const datePart = new Date().toISOString().slice(0, 10)
+    const filename = `brainstorm-${slugifyFilePart(title)}-${datePart}.pdf`
+    pdf.save(filename)
+  } catch (err) {
+    console.error('Failed to generate brainstorm PDF:', err)
+  } finally {
+    exportingBrainstormPdf.value = false
   }
 }
 
@@ -1482,11 +1706,12 @@ const filteredList = computed(() => {
               <button
                 @click="downloadResearchPdf"
                 :disabled="!researchDetail.content || exportingResearchPdf"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                title="Download PDF"
+                aria-label="Download PDF"
+                class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
               >
                 <Loader2 v-if="exportingResearchPdf" class="h-3.5 w-3.5 animate-spin" />
                 <Download v-else class="h-3.5 w-3.5" />
-                {{ exportingResearchPdf ? 'Preparing PDF...' : 'Download PDF' }}
               </button>
               <button
                 @click="handleDelete('research', researchDetail._id)"
@@ -1554,6 +1779,16 @@ const filteredList = computed(() => {
               <p v-if="brainstormDetail.bigIdea" class="text-sm text-muted-foreground">{{ brainstormDetail.bigIdea }}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="downloadBrainstormPdf"
+                :disabled="!brainstormDetail.content || exportingBrainstormPdf"
+                title="Download PDF"
+                aria-label="Download PDF"
+                class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <Loader2 v-if="exportingBrainstormPdf" class="h-3.5 w-3.5 animate-spin" />
+                <Download v-else class="h-3.5 w-3.5" />
+              </button>
               <button
                 @click="handleDelete('brainstorm', brainstormDetail._id)"
                 :disabled="deletingId === brainstormDetail._id"
