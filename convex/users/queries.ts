@@ -21,6 +21,7 @@ export const getMe = query({
       _id: userId,
       email: authUser.email,
       name: profile?.pastorName ?? authUser.name ?? "",
+      image: authUser.image ?? "",
       creditBalance: profile?.creditBalance ?? 0,
       hasProfile: !!profile,
       needsOnboarding,

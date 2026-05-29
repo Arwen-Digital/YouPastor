@@ -15,6 +15,28 @@ async function requireAdmin(ctx: any) {
   return { userId, authUser }
 }
 
+export const listRecentUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx)
+
+    const users = await ctx.db.query("users").order("desc").take(10)
+    const profiles = await ctx.db.query("churchProfiles").take(500)
+    const profileByUserId = new Map(profiles.map((p: any) => [String(p.userId), p]))
+
+    return users.map((u: any) => {
+      const profile = profileByUserId.get(String(u._id))
+      return {
+        _id: u._id,
+        email: u.email ?? "",
+        name: profile?.pastorName ?? u.name ?? "",
+        churchName: profile?.churchName ?? "",
+        creditBalance: profile?.creditBalance ?? 0,
+      }
+    })
+  },
+})
+
 export const searchUsers = query({
   args: { term: v.string() },
   handler: async (ctx, args) => {

@@ -279,7 +279,14 @@ onUnmounted(() => {
           </div>
         </div>
         <div v-if="auth.user?.email" class="pb-2 px-3 mb-1.5 border-b border-border/40 flex items-center gap-2 text-xs text-muted-foreground min-w-0">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+          <img
+            v-if="auth.user?.image"
+            :src="auth.user.image"
+            alt=""
+            class="w-5 h-5 rounded-full shrink-0 object-cover"
+            referrerpolicy="no-referrer"
+          />
+          <span v-else class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
           <span class="truncate font-medium" :title="auth.user.email">{{ auth.user.email }}</span>
         </div>
         <button

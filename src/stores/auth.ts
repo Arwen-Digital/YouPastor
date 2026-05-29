@@ -11,6 +11,7 @@ export interface AuthUser {
   _id: string
   email: string
   name: string
+  image?: string
   creditBalance: number
   hasProfile: boolean
   needsOnboarding: boolean
@@ -64,6 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
       _id: 'dev-user',
       email: email ?? 'pastor@youpastor.app',
       name: name ?? 'Pastor Arnold',
+      image: '',
       creditBalance: 100,
       hasProfile: true,
       needsOnboarding: false,

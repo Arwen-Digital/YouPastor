@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Shield, Search, Gift, Ticket } from 'lucide-vue-next'
 import { getConvexClient } from '@/lib/convex'
 
@@ -28,10 +28,24 @@ const pagedTransactions = computed(() => {
   return transactions.value.slice(start, start + txPageSize)
 })
 
+async function loadRecentUsers() {
+  isSearching.value = true
+  searchError.value = null
+  try {
+    const client = getConvexClient()
+    const result = await client.query('admin/queries:listRecentUsers' as any, {})
+    users.value = result ?? []
+  } catch (err: any) {
+    searchError.value = err?.message || 'Failed to load users.'
+  } finally {
+    isSearching.value = false
+  }
+}
+
 async function runSearch() {
   const term = searchTerm.value.trim()
   if (!term) {
-    users.value = []
+    await loadRecentUsers()
     return
   }
 
@@ -181,6 +195,15 @@ watch(activeTab, (tab) => {
   if (tab === 'vouchers') {
     loadVouchers()
   }
+  if (tab === 'users' && !searchTerm.value.trim()) {
+    loadRecentUsers()
+  }
+})
+
+onMounted(() => {
+  if (activeTab.value === 'users') {
+    loadRecentUsers()
+  }
 })
 </script>
 
@@ -229,6 +252,8 @@ watch(activeTab, (tab) => {
           </button>
         </div>
         <p v-if="searchError" class="text-sm text-destructive">{{ searchError }}</p>
+
+        <p v-if="!searchTerm.trim()" class="text-xs text-muted-foreground">Latest 10 users (newest first)</p>
 
         <div v-if="users.length" class="grid gap-2">
           <button
