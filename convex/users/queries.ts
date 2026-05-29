@@ -28,6 +28,19 @@ export const getMe = query({
   },
 })
 
+export const getBrevoContact = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (!userId) return null
+
+    return await ctx.db
+      .query("brevoContacts")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first()
+  },
+})
+
 export const listAll = query({
   args: {},
   handler: async (ctx) => {

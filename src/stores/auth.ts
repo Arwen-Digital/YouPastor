@@ -101,6 +101,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (data) {
         user.value = data as AuthUser
         isAuthenticated.value = true
+
+        void client.action('users/actions:syncBrevoContact' as any, {}).catch((err: any) => {
+          console.warn('[brevo] Failed to sync contact:', err?.message || String(err))
+        })
       } else {
         user.value = null
         isAuthenticated.value = false

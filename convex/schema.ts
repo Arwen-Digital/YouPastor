@@ -5,6 +5,14 @@ import { authTables } from "@convex-dev/auth/server"
 export default defineSchema({
   ...authTables,
 
+  brevoContacts: defineTable({
+    userId: v.id("users"),
+    email: v.string(),
+    listId: v.number(),
+    syncedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
   // Church foundation profile — set once per user, used by all skills
   churchProfiles: defineTable({
     userId: v.id("users"),

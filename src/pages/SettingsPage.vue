@@ -9,10 +9,34 @@ import { useConvexMutation } from '@/composables/useConvexMutation'
 const router = useRouter()
 const auth = useAuthStore()
 
+const countries = [
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
+  'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+  'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia',
+  'Cameroon', 'Canada', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica',
+  'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Democratic Republic of the Congo', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador',
+  'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France',
+  'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau',
+  'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland',
+  'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan',
+  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+  'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico', 'Micronesia',
+  'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal',
+  'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway', 'Oman', 'Pakistan',
+  'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania',
+  'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal',
+  'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa', 'South Korea',
+  'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan',
+  'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
+  'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
+]
+
 const { result: balanceResult } = useConvexQuery('credits/queries:getMyBalance' as any)
 const { result: profileResult } = useConvexQuery('profile/queries:getMine' as any)
 const { result: additionsResult } = useConvexQuery('credits/queries:listMyCreditAdditions' as any)
 const { mutate: saveProfile, isLoading: isSavingProfile } = useConvexMutation('profile/mutations:upsert' as any)
+const { mutate: deleteMyAccount, isLoading: isDeletingAccount } = useConvexMutation('users/mutations:deleteMyAccount' as any)
 
 const creditBalance = computed(() => balanceResult.value?.creditBalance ?? auth.user?.creditBalance ?? 0)
 
@@ -21,32 +45,42 @@ const form = ref({
   churchName: '',
   denomination: '',
   averageAttendance: '',
-  location: '',
+  locationCity: '',
+  locationCountry: '',
   bibleTranslation: 'NIV',
 })
 
 watch(profileResult, (profile: any) => {
   if (!profile) return
+  const rawLocation = String(profile.location ?? '')
+  const [cityPart, ...countryParts] = rawLocation.split(',')
   form.value = {
     pastorName: profile.pastorName ?? '',
     churchName: profile.churchName ?? '',
     denomination: profile.denomination ?? '',
     averageAttendance: profile.averageAttendance ?? '',
-    location: profile.location ?? '',
+    locationCity: (cityPart ?? '').trim(),
+    locationCountry: countryParts.join(',').trim(),
     bibleTranslation: profile.bibleTranslation ?? 'NIV',
   }
 }, { immediate: true })
 
 const saveMessage = ref<string | null>(null)
+const deleteConfirmText = ref('')
+const deleteError = ref<string | null>(null)
 
 async function handleSaveProfile() {
   saveMessage.value = null
+  const location = [form.value.locationCity.trim(), form.value.locationCountry.trim()]
+    .filter(Boolean)
+    .join(', ')
+
   const result = await saveProfile({
     pastorName: form.value.pastorName,
     churchName: form.value.churchName,
     denomination: form.value.denomination,
     averageAttendance: form.value.averageAttendance,
-    location: form.value.location,
+    location,
     bibleTranslation: form.value.bibleTranslation,
   } as any)
 
@@ -60,6 +94,23 @@ async function handleSaveProfile() {
 function formatDate(ts?: number): string {
   if (!ts) return ''
   return new Date(ts).toLocaleString()
+}
+
+async function handleDeleteAccount() {
+  deleteError.value = null
+  if (deleteConfirmText.value !== 'DELETE') return
+
+  const confirmed = window.confirm('This will permanently delete your account and data. Continue?')
+  if (!confirmed) return
+
+  try {
+    const ok = await deleteMyAccount({} as any)
+    if (!ok) throw new Error('Delete failed')
+    await auth.signOut()
+    router.push('/login')
+  } catch (err: any) {
+    deleteError.value = err?.message || 'Unable to delete account.'
+  }
 }
 </script>
 
@@ -116,8 +167,15 @@ function formatDate(ts?: number): string {
             <input v-model="form.averageAttendance" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring" />
           </div>
           <div class="space-y-1">
-            <label class="text-xs text-muted-foreground">Location</label>
-            <input v-model="form.location" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring" />
+            <label class="text-xs text-muted-foreground">City / Town</label>
+            <input v-model="form.locationCity" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs text-muted-foreground">Country</label>
+            <select v-model="form.locationCountry" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring">
+              <option value="">Select country</option>
+              <option v-for="country in countries" :key="country" :value="country">{{ country }}</option>
+            </select>
           </div>
           <div class="space-y-1">
             <label class="text-xs text-muted-foreground">Bible Translation</label>
@@ -163,6 +221,26 @@ function formatDate(ts?: number): string {
             </div>
             <div class="text-xs text-muted-foreground">{{ tx.type }} • {{ formatDate(tx.createdAt) }}</div>
           </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-destructive/30 bg-card p-5 space-y-3">
+        <h3 class="text-sm font-semibold text-destructive">Danger Zone</h3>
+        <p class="text-xs text-muted-foreground">Type <span class="font-semibold text-foreground">DELETE</span> to permanently remove your account and all associated data.</p>
+        <div class="flex flex-col gap-2 max-w-sm">
+          <input
+            v-model="deleteConfirmText"
+            class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring"
+            placeholder="Type DELETE to confirm"
+          />
+          <button
+            @click="handleDeleteAccount"
+            :disabled="deleteConfirmText !== 'DELETE' || isDeletingAccount"
+            class="inline-flex items-center justify-center rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {{ isDeletingAccount ? 'Deleting account...' : 'Delete my account' }}
+          </button>
+          <p v-if="deleteError" class="text-xs text-destructive">{{ deleteError }}</p>
         </div>
       </div>
     </div>
