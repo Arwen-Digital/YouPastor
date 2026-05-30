@@ -245,6 +245,31 @@ async function handleDeleteAccount() {
           <p v-if="deleteError" class="text-xs text-destructive">{{ deleteError }}</p>
         </div>
       </div>
+
+      <div class="rounded-xl border bg-card p-5 space-y-2">
+        <h3 class="text-sm font-semibold text-foreground">Acknowledgement</h3>
+        <p class="text-xs text-muted-foreground">
+          Some AI chat capabilities in YouPastor are inspired by a modified version of Thomas Costello’s Pastor AI Skills for Claude.
+          <a
+            href="https://github.com/tkcostello/pastor-ai-skills"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline underline-offset-2 text-foreground"
+          >
+            https://github.com/tkcostello/pastor-ai-skills
+          </a>
+          We’re grateful to Pastor Thomas for open-sourcing this work.
+          Developed by
+          <a
+            href="https://arnold.gamboa.ph"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline underline-offset-2 text-foreground"
+          >
+            Arnold Gamboa
+          </a>.
+        </p>
+      </div>
     </div>
   </div>
 </template>
