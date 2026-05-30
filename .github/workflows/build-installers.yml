@@ -34,12 +34,19 @@ jobs:
 
       - name: Build installers (manual/non-tag)
         if: startsWith(github.ref, 'refs/tags/') == false
+        env:
+          VITE_CONVEX_URL: https://uncommon-dodo-93.convex.cloud
+          VITE_CONVEX_SITE_URL: https://uncommon-dodo-93.convex.site
+          VITE_ENABLE_GOOGLE_AUTH: "true"
         run: npm run build
 
       - name: Publish installers to GitHub Release (tag)
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_CONVEX_URL: https://uncommon-dodo-93.convex.cloud
+          VITE_CONVEX_SITE_URL: https://uncommon-dodo-93.convex.site
+          VITE_ENABLE_GOOGLE_AUTH: "true"
         run: npm run publish
 
       - name: Upload build artifacts

@@ -1,6 +1,7 @@
 import { ConvexClient, ConvexHttpClient } from 'convex/browser'
 
-const convexUrl = import.meta.env.VITE_CONVEX_URL as string
+const DEFAULT_PRODUCTION_CONVEX_URL = 'https://uncommon-dodo-93.convex.cloud'
+const convexUrl = (import.meta.env.VITE_CONVEX_URL || (import.meta.env.PROD ? DEFAULT_PRODUCTION_CONVEX_URL : '')) as string
 
 export const CONVEX_AUTH_TOKEN_KEY = '__convexAuthJWT'
 export const CONVEX_AUTH_REFRESH_TOKEN_KEY = '__convexAuthRefreshToken'
