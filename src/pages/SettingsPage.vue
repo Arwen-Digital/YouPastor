@@ -36,7 +36,7 @@ const { result: balanceResult } = useConvexQuery('credits/queries:getMyBalance' 
 const { result: profileResult } = useConvexQuery('profile/queries:getMine' as any)
 const { result: additionsResult } = useConvexQuery('credits/queries:listMyCreditAdditions' as any)
 const { mutate: saveProfile, isLoading: isSavingProfile } = useConvexMutation('profile/mutations:upsert' as any)
-const { mutate: deleteMyAccount, isLoading: isDeletingAccount } = useConvexMutation('users/mutations:deleteMyAccount' as any)
+const { mutate: deleteMyAccount, isLoading: isDeletingAccount, error: deleteAccountMutationError } = useConvexMutation('users/mutations:deleteMyAccount' as any)
 
 const creditBalance = computed(() => balanceResult.value?.creditBalance ?? auth.user?.creditBalance ?? 0)
 
@@ -105,7 +105,9 @@ async function handleDeleteAccount() {
 
   try {
     const ok = await deleteMyAccount({} as any)
-    if (!ok) throw new Error('Delete failed')
+    if (!ok) {
+      throw new Error(deleteAccountMutationError.value?.message || 'Delete failed')
+    }
     await auth.signOut()
     router.push('/login')
   } catch (err: any) {

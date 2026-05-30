@@ -140,8 +140,8 @@ function createWindow() {
     icon: appIconPath,
     title: 'YouPastor',
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
-    width: 1280,
-    height: 800,
+    width: 1536,
+    height: 960,
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
