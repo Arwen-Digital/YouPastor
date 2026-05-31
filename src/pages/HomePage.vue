@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Lightbulb, BookOpen, MessageSquare, Layers } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const auth = useAuthStore()
+const firstName = computed(() => {
+  const fullName = String(auth.user?.name ?? '').trim()
+  return fullName ? fullName.split(/\s+/)[0] : 'Pastor'
+})
 
 interface QuickAction {
   label: string
@@ -46,7 +51,7 @@ const quickActions: QuickAction[] = [
     <div class="w-full max-w-2xl space-y-8">
       <div class="text-center space-y-2">
         <h1 class="text-3xl font-semibold tracking-tight text-foreground">
-          Hi {{ auth.user?.name || 'Pastor' }}! How can I help you today?
+          Hi {{ firstName }}! How can I help you today?
         </h1>
       </div>
 

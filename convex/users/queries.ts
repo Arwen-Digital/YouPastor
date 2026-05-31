@@ -16,11 +16,12 @@ export const getMe = query({
       .first()
 
     const needsOnboarding = !profile?.onboardingComplete
+    const profileName = [profile?.pastorFirstName ?? "", profile?.pastorLastName ?? ""].filter(Boolean).join(" ").trim()
 
     return {
       _id: userId,
       email: authUser.email,
-      name: profile?.pastorName ?? authUser.name ?? "",
+      name: profileName || profile?.pastorName || authUser.name || "",
       image: authUser.image ?? "",
       creditBalance: profile?.creditBalance ?? 0,
       hasProfile: !!profile,

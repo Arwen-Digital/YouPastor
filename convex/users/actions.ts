@@ -16,10 +16,17 @@ export const syncBrevoContact = action({
     }
 
     const me = await ctx.runQuery(api.users.queries.getMe, {})
+    const profile = await ctx.runQuery(api.profile.queries.getMine, {})
+
     const email = String(me?.email ?? "").trim().toLowerCase()
     if (!email) {
       return { ok: false, skipped: true, reason: "missing_email" }
     }
+
+    const fallbackName = String(me?.name ?? "").trim()
+    const nameParts = fallbackName ? fallbackName.split(/\s+/) : []
+    const firstName = String(profile?.pastorFirstName ?? nameParts[0] ?? "").trim()
+    const lastName = String(profile?.pastorLastName ?? nameParts.slice(1).join(" ") ?? "").trim()
 
     const brevoApiKey = process.env.BREVO_API_KEY
     if (!brevoApiKey) {
@@ -37,6 +44,10 @@ export const syncBrevoContact = action({
         email,
         listIds: [BREVO_LIST_ID],
         updateEnabled: true,
+        attributes: {
+          FIRSTNAME: firstName,
+          LASTNAME: lastName,
+        },
       }),
     })
 

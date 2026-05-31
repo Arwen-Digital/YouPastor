@@ -18,6 +18,8 @@ export default defineSchema({
     userId: v.id("users"),
     churchName: v.optional(v.string()),
     pastorName: v.optional(v.string()),
+    pastorFirstName: v.optional(v.string()),
+    pastorLastName: v.optional(v.string()),
     denomination: v.optional(v.string()),
     averageAttendance: v.optional(v.string()),
     location: v.optional(v.string()),

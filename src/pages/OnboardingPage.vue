@@ -21,11 +21,12 @@ const steps = [
     icon: Church,
   },
   {
-    key: 'pastorName',
+    key: 'pastorFirstName',
     label: 'Pastor Name',
     description: 'What should we call you?',
-    placeholder: 'Pastor Mike',
+    placeholder: 'First Name',
     icon: User,
+    isPastorName: true,
   },
   {
     key: 'denomination',
@@ -97,6 +98,8 @@ const bibleTranslations = [
 
 const formValues = ref<Record<string, string>>({
   churchName: '',
+  pastorFirstName: '',
+  pastorLastName: '',
   pastorName: '',
   denomination: '',
   averageAttendance: '',
@@ -114,6 +117,10 @@ const currentValue = computed({
 
 const canProceed = computed(() => {
   const stepKey = steps[currentStep.value].key
+
+  if (stepKey === 'pastorFirstName') {
+    return !!formValues.value.pastorFirstName.trim()
+  }
 
   if (stepKey === 'location') {
     return !!formValues.value.locationCity.trim() && !!formValues.value.locationCountry.trim()
@@ -134,11 +141,13 @@ const progressPercent = computed(() => {
   return ((currentStep.value + 1) / steps.length) * 100
 })
 
-// Pre-fill pastorName from auth user name
+// Pre-fill pastor first/last name from auth user name
 watch(() => auth.user?.name, (name) => {
-  if (name && !formValues.value.pastorName) {
-    formValues.value.pastorName = name
-  }
+  if (!name || formValues.value.pastorFirstName) return
+  const parts = name.trim().split(/\s+/)
+  formValues.value.pastorFirstName = parts[0] ?? ''
+  formValues.value.pastorLastName = parts.slice(1).join(' ')
+  formValues.value.pastorName = [formValues.value.pastorFirstName, formValues.value.pastorLastName].filter(Boolean).join(' ')
 }, { immediate: true })
 
 async function handleNext() {
@@ -147,18 +156,30 @@ async function handleNext() {
   try {
     const client = getConvexClient()
     const fieldKey = steps[currentStep.value].key
-    const fieldValue = fieldKey === 'location'
-      ? `${formValues.value.locationCity.trim()}, ${formValues.value.locationCountry.trim()}`
-      : formValues.value[fieldKey]
 
-    if (fieldKey === 'location') {
-      formValues.value.location = fieldValue
+    if (fieldKey === 'pastorFirstName') {
+      const pastorFirstName = formValues.value.pastorFirstName.trim()
+      const pastorLastName = formValues.value.pastorLastName.trim()
+      const pastorName = [pastorFirstName, pastorLastName].filter(Boolean).join(' ')
+      formValues.value.pastorName = pastorName
+      await client.mutation('profile/mutations:upsert' as any, {
+        pastorFirstName,
+        pastorLastName,
+        pastorName,
+      })
+    } else {
+      const fieldValue = fieldKey === 'location'
+        ? `${formValues.value.locationCity.trim()}, ${formValues.value.locationCountry.trim()}`
+        : formValues.value[fieldKey]
+
+      if (fieldKey === 'location') {
+        formValues.value.location = fieldValue
+      }
+
+      await client.mutation('profile/mutations:upsert' as any, {
+        [fieldKey]: fieldValue,
+      })
     }
-
-    // Save the current field to the database
-    await client.mutation('profile/mutations:upsert' as any, {
-      [fieldKey]: fieldValue,
-    })
   } catch (err) {
     console.error('Failed to save onboarding step:', err)
   }
@@ -318,6 +339,35 @@ async function handleSkip() {
                     <div class="text-xs text-muted-foreground">{{ translation.description }}</div>
                   </div>
                 </div>
+              </div>
+
+              <!-- Pastor name step: first + last -->
+              <div v-else-if="currentStepData.isPastorName" class="space-y-3">
+                <div class="space-y-1.5">
+                  <label class="text-xs text-muted-foreground">First Name</label>
+                  <input
+                    v-model="formValues.pastorFirstName"
+                    type="text"
+                    placeholder="First Name"
+                    maxlength="80"
+                    class="flex h-12 w-full rounded-md border border-input bg-card px-4 py-3 text-base transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    @keydown.enter="canProceed && handleNext()"
+                  />
+                </div>
+
+                <div class="space-y-1.5">
+                  <label class="text-xs text-muted-foreground">Last Name (optional)</label>
+                  <input
+                    v-model="formValues.pastorLastName"
+                    type="text"
+                    placeholder="Last Name"
+                    maxlength="80"
+                    class="flex h-12 w-full rounded-md border border-input bg-card px-4 py-3 text-base transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    @keydown.enter="canProceed && handleNext()"
+                  />
+                </div>
+
+                <p class="text-xs text-muted-foreground">You can change this later in Settings</p>
               </div>
 
               <!-- Location step: City/Town + Country -->

@@ -33,7 +33,7 @@
       "dmg",
       "zip"
     ],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+    "artifactName": "${productName}-Mac-${arch}-Installer.${ext}"
   },
   "win": {
     "icon": "build/icons/icon.ico",
@@ -45,7 +45,7 @@
         ]
       }
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    "artifactName": "${productName}-Windows-Setup.${ext}"
   },
   "nsis": {
     "oneClick": false,

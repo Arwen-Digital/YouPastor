@@ -41,7 +41,8 @@ const { mutate: deleteMyAccount, isLoading: isDeletingAccount, error: deleteAcco
 const creditBalance = computed(() => balanceResult.value?.creditBalance ?? auth.user?.creditBalance ?? 0)
 
 const form = ref({
-  pastorName: '',
+  pastorFirstName: '',
+  pastorLastName: '',
   churchName: '',
   denomination: '',
   averageAttendance: '',
@@ -54,8 +55,11 @@ watch(profileResult, (profile: any) => {
   if (!profile) return
   const rawLocation = String(profile.location ?? '')
   const [cityPart, ...countryParts] = rawLocation.split(',')
+  const fallbackName = String(profile.pastorName ?? '').trim()
+  const nameParts = fallbackName ? fallbackName.split(/\s+/) : []
   form.value = {
-    pastorName: profile.pastorName ?? '',
+    pastorFirstName: profile.pastorFirstName ?? (nameParts[0] ?? ''),
+    pastorLastName: profile.pastorLastName ?? nameParts.slice(1).join(' '),
     churchName: profile.churchName ?? '',
     denomination: profile.denomination ?? '',
     averageAttendance: profile.averageAttendance ?? '',
@@ -75,8 +79,12 @@ async function handleSaveProfile() {
     .filter(Boolean)
     .join(', ')
 
+  const pastorName = [form.value.pastorFirstName.trim(), form.value.pastorLastName.trim()].filter(Boolean).join(' ')
+
   const result = await saveProfile({
-    pastorName: form.value.pastorName,
+    pastorFirstName: form.value.pastorFirstName,
+    pastorLastName: form.value.pastorLastName,
+    pastorName,
     churchName: form.value.churchName,
     denomination: form.value.denomination,
     averageAttendance: form.value.averageAttendance,
@@ -153,8 +161,12 @@ async function handleDeleteAccount() {
 
         <div class="grid gap-3 md:grid-cols-2">
           <div class="space-y-1">
-            <label class="text-xs text-muted-foreground">Pastor Name</label>
-            <input v-model="form.pastorName" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring" />
+            <label class="text-xs text-muted-foreground">Pastor First Name</label>
+            <input v-model="form.pastorFirstName" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-xs text-muted-foreground">Pastor Last Name</label>
+            <input v-model="form.pastorLastName" class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-ring" />
           </div>
           <div class="space-y-1">
             <label class="text-xs text-muted-foreground">Church Name</label>

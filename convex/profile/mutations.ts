@@ -7,6 +7,8 @@ export const upsert = mutation({
   args: {
     churchName: v.optional(v.string()),
     pastorName: v.optional(v.string()),
+    pastorFirstName: v.optional(v.string()),
+    pastorLastName: v.optional(v.string()),
     denomination: v.optional(v.string()),
     averageAttendance: v.optional(v.string()),
     location: v.optional(v.string()),
@@ -22,20 +24,28 @@ export const upsert = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first()
 
+    const computedPastorName = [args.pastorFirstName ?? "", args.pastorLastName ?? ""].filter(Boolean).join(" ").trim()
+    const normalizedArgs = {
+      ...args,
+      pastorName: computedPastorName || args.pastorName,
+    }
+
     if (existing) {
-      await ctx.db.patch(existing._id, args)
+      await ctx.db.patch(existing._id, normalizedArgs)
       return existing._id
     }
 
     return await ctx.db.insert("churchProfiles", {
       userId,
-      churchName: args.churchName ?? "",
-      pastorName: args.pastorName ?? "",
-      denomination: args.denomination,
-      averageAttendance: args.averageAttendance,
-      location: args.location,
-      bibleTranslation: args.bibleTranslation,
-      onboardingComplete: args.onboardingComplete,
+      churchName: normalizedArgs.churchName ?? "",
+      pastorName: normalizedArgs.pastorName ?? "",
+      pastorFirstName: normalizedArgs.pastorFirstName,
+      pastorLastName: normalizedArgs.pastorLastName,
+      denomination: normalizedArgs.denomination,
+      averageAttendance: normalizedArgs.averageAttendance,
+      location: normalizedArgs.location,
+      bibleTranslation: normalizedArgs.bibleTranslation,
+      onboardingComplete: normalizedArgs.onboardingComplete,
       creditBalance: FREE_SIGNUP_CREDITS,
     })
   },
@@ -56,10 +66,17 @@ export const createMinimal = mutation({
 
     if (existing) return existing._id
 
+    const fullName = (args.pastorName ?? "").trim()
+    const nameParts = fullName ? fullName.split(/\s+/) : []
+    const pastorFirstName = nameParts[0] ?? ""
+    const pastorLastName = nameParts.slice(1).join(" ")
+
     return await ctx.db.insert("churchProfiles", {
       userId,
       churchName: "",
-      pastorName: args.pastorName ?? "",
+      pastorName: fullName,
+      pastorFirstName,
+      pastorLastName,
       creditBalance: FREE_SIGNUP_CREDITS,
     })
   },
