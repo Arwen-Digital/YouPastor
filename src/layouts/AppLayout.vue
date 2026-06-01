@@ -136,8 +136,8 @@ async function installUpdateNow() {
   const ua = navigator.userAgent.toLowerCase()
   const isWindows = ua.includes('win')
   const downloadUrl = isWindows
-    ? 'https://youpastor.com/download?platform=windows'
-    : 'https://youpastor.com/download?platform=mac'
+    ? 'https://assets.youpastor.com/releases/windows/index.html'
+    : 'https://assets.youpastor.com/releases/mac-universal/index.html'
 
   try {
     await window.appLinks?.openExternal(downloadUrl)
