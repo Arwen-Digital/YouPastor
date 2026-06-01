@@ -83,5 +83,8 @@ jobs:
             release-artifacts/**/*.zip
             release-artifacts/**/*.exe
             release-artifacts/**/*.AppImage
+            release-artifacts/**/*.yml
+            release-artifacts/**/*.yaml
+            release-artifacts/**/*.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
