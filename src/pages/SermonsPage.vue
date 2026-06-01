@@ -19,6 +19,14 @@ function goStandalone(action: SermonAction) {
   router.push(`/sermons/${action}/standalone`)
 }
 
+function goPlanSeries() {
+  router.push('/series')
+}
+
+function goCreateSeriesQuick() {
+  router.push('/series/create-quick')
+}
+
 function goSeries(action: SermonAction, seriesId: string) {
   router.push(`/sermons/${action}/series/${seriesId}`)
 }
@@ -108,10 +116,34 @@ function stripHtml(html: string): string {
             </div>
           </div>
 
+          <div class="grid gap-3 sm:grid-cols-2">
+            <button
+              @click="goPlanSeries"
+              class="w-full flex items-center justify-between p-4 rounded-2xl border border-border bg-card/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            >
+              <div class="text-left">
+                <div class="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Plan a Series</div>
+                <div class="text-xs text-muted-foreground mt-0.5">Open Series Planner</div>
+              </div>
+              <ChevronRight class="h-4 w-4 text-primary/70 group-hover:text-primary transition-colors" />
+            </button>
+
+            <button
+              @click="goCreateSeriesQuick"
+              class="w-full flex items-center justify-between p-4 rounded-2xl border border-border bg-card/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            >
+              <div class="text-left">
+                <div class="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Create a new series</div>
+                <div class="text-xs text-muted-foreground mt-0.5">Quick create with title and tagline</div>
+              </div>
+              <ChevronRight class="h-4 w-4 text-primary/70 group-hover:text-primary transition-colors" />
+            </button>
+          </div>
+
           <!-- Standalone Sermon Button -->
           <button
             @click="goStandalone('create')"
-            class="w-full flex items-center justify-between p-4 rounded-2xl border border-dashed border-border bg-transparent hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            class="w-full flex items-center justify-between p-4 rounded-2xl border border-border bg-card/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 transition-all group"
           >
             <div class="flex items-center gap-4">
               <div class="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">

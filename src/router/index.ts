@@ -116,6 +116,11 @@ const routes = [
         component: () => import('@/pages/SeriesPage.vue'),
       },
       {
+        path: 'series/create-quick',
+        name: 'series-create-quick',
+        component: () => import('@/pages/CreateSeriesPage.vue'),
+      },
+      {
         path: 'sermons',
         name: 'sermons',
         component: () => import('@/pages/SermonsPage.vue'),
