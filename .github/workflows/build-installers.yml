@@ -41,8 +41,8 @@ jobs:
         run: |
           npx vue-tsc
           npx vite build
-          npx electron-builder --mac dmg zip --universal
-          npx electron-builder --mac dmg zip --x64
+          npx electron-builder --mac dmg zip --universal --publish never
+          npx electron-builder --mac dmg zip --x64 --publish never
 
       - name: Build Windows installers
         if: matrix.os == 'windows-latest'
@@ -50,7 +50,10 @@ jobs:
           VITE_CONVEX_URL: https://uncommon-dodo-93.convex.cloud
           VITE_CONVEX_SITE_URL: https://uncommon-dodo-93.convex.site
           VITE_ENABLE_GOOGLE_AUTH: "true"
-        run: npm run build
+        run: |
+          npx vue-tsc
+          npx vite build
+          npx electron-builder --win nsis --x64 --publish never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
