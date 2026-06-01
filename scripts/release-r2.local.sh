@@ -44,18 +44,16 @@ npm version "$BUMP_TYPE"
 VERSION="v$(node -p "require('./package.json').version")"
 RELEASE_DIR="release/${VERSION#v}"
 
-echo "Building artifacts for $VERSION..."
+echo "Building macOS artifacts for $VERSION..."
 npx vue-tsc
 npx vite build
 npx electron-builder --mac dmg zip --universal --publish never
 npx electron-builder --mac dmg zip --x64 --publish never
-npx electron-builder --win nsis --x64 --publish never
 
 MAC_UNIVERSAL_DMG="$RELEASE_DIR/YouPastor-Mac-universal-Installer.dmg"
 MAC_INTEL_DMG="$RELEASE_DIR/YouPastor-Mac-x64-Installer.dmg"
-WINDOWS_EXE="$RELEASE_DIR/YouPastor-Windows-Setup.exe"
 
-for f in "$MAC_UNIVERSAL_DMG" "$MAC_INTEL_DMG" "$WINDOWS_EXE"; do
+for f in "$MAC_UNIVERSAL_DMG" "$MAC_INTEL_DMG"; do
   if [[ ! -f "$f" ]]; then
     echo "Missing expected artifact: $f"
     exit 1
@@ -88,17 +86,16 @@ write_redirect() {
 HTML
 }
 
-echo "Uploading versioned artifacts..."
+echo "Uploading versioned macOS artifacts..."
 upload_file "$MAC_UNIVERSAL_DMG" "releases/$VERSION/YouPastor-Mac-universal-Installer.dmg"
 upload_file "$MAC_INTEL_DMG" "releases/$VERSION/YouPastor-Mac-x64-Installer.dmg"
-upload_file "$WINDOWS_EXE" "releases/$VERSION/YouPastor-Windows-Setup.exe"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 MAC_UNIVERSAL_URL="$R2_PUBLIC_BASE_URL/releases/$VERSION/YouPastor-Mac-universal-Installer.dmg"
 MAC_INTEL_URL="$R2_PUBLIC_BASE_URL/releases/$VERSION/YouPastor-Mac-x64-Installer.dmg"
-WINDOWS_URL="$R2_PUBLIC_BASE_URL/releases/$VERSION/YouPastor-Windows-Setup.exe"
+WINDOWS_URL="https://github.com/Arwen-Digital/YouPastor/releases/latest/download/YouPastor-Windows-Setup.exe"
 
 write_redirect "$MAC_UNIVERSAL_URL" > "$TMP_DIR/mac-universal-index.html"
 write_redirect "$MAC_INTEL_URL" > "$TMP_DIR/mac-intel-index.html"
@@ -109,7 +106,7 @@ upload_file "$TMP_DIR/mac-universal-index.html" "releases/mac-universal/index.ht
 upload_file "$TMP_DIR/mac-intel-index.html" "releases/mac-intel/index.html"
 upload_file "$TMP_DIR/windows-index.html" "releases/windows/index.html"
 
-echo "Pushing commit and tags..."
+echo "Pushing commit and tags (triggers Windows GitHub Actions build)..."
 git push --follow-tags
 
 echo "Done."
