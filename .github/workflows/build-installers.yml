@@ -16,6 +16,7 @@ jobs:
     strategy:
       matrix:
         os:
+          - macos-latest
           - windows-latest
 
     steps:
@@ -31,7 +32,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build macOS signed + notarized installers
+        if: matrix.os == 'macos-latest'
+        env:
+          VITE_CONVEX_URL: https://uncommon-dodo-93.convex.cloud
+          VITE_CONVEX_SITE_URL: https://uncommon-dodo-93.convex.site
+          VITE_ENABLE_GOOGLE_AUTH: "true"
+          CSC_LINK_BASE64: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/developer-id-application.p12"
+          printf '%s' "$CSC_LINK_BASE64" | base64 -D > "$CERT_PATH"
+          export CSC_LINK="$CERT_PATH"
+          npx vue-tsc
+          npx vite build
+          npx electron-builder --mac dmg zip --universal --publish never
+          npx electron-builder --mac dmg zip --x64 --publish never
+
       - name: Build Windows installers
+        if: matrix.os == 'windows-latest'
         env:
           VITE_CONVEX_URL: https://uncommon-dodo-93.convex.cloud
           VITE_CONVEX_SITE_URL: https://uncommon-dodo-93.convex.site

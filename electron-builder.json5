@@ -33,6 +33,13 @@
       "dmg",
       "zip"
     ],
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+    "notarize": {
+      "teamId": "${env.APPLE_TEAM_ID}"
+    },
     "artifactName": "${productName}-Mac-${arch}-Installer.${ext}"
   },
   "win": {
