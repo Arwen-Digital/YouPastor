@@ -38,7 +38,7 @@
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.inherit.plist",
     "notarize": {
-      "teamId": "${env.APPLE_TEAM_ID}"
+      "teamId": "3XU2TC5S3R"
     },
     "artifactName": "${productName}-Mac-${arch}-Installer.${ext}"
   },
