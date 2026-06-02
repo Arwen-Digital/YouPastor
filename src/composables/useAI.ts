@@ -49,6 +49,10 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
         maxTokens: options?.maxTokens,
       })
 
+      if (actionResult?.error) {
+        throw new Error(actionResult.error)
+      }
+
       const result: ChatCompletionResult = {
         content: actionResult?.content ?? '',
         citations: actionResult?.citations,

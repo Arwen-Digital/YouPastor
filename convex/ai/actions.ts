@@ -104,27 +104,26 @@ export const chat = action({
     maxTokens: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    if (!(args.operation in AI_OPERATION_CREDITS)) {
-      throw new Error(`Unknown AI operation: ${args.operation}`)
-    }
-
-    const operation = args.operation as AIOperation
-    const creditsToCharge = AI_OPERATION_CREDITS[operation]
-    const resolvedModel = resolveModelFromEnv(args.modelRole as ModelRole)
-
-    await ctx.runMutation("credits/internal:assertSufficientCredits" as any, {
-      requiredCredits: creditsToCharge,
-      operation,
-    })
-
-    const apiKey = process.env.OPENROUTER_API_KEY || process.env.VITE_AI_API_KEY
-    if (!apiKey) {
-      throw new Error("OPENROUTER_API_KEY is not configured on the backend")
-    }
-
-    const baseUrl = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1"
-
     try {
+      if (!(args.operation in AI_OPERATION_CREDITS)) {
+        throw new Error(`Unknown AI operation: ${args.operation}`)
+      }
+
+      const operation = args.operation as AIOperation
+      const creditsToCharge = AI_OPERATION_CREDITS[operation]
+      const resolvedModel = resolveModelFromEnv(args.modelRole as ModelRole)
+
+      await ctx.runMutation("credits/internal:assertSufficientCredits" as any, {
+        requiredCredits: creditsToCharge,
+        operation,
+      })
+
+      const apiKey = process.env.OPENROUTER_API_KEY || process.env.VITE_AI_API_KEY || process.env.VITE_OPENROUTER_API_KEY
+      if (!apiKey) {
+        throw new Error("OPENROUTER_API_KEY is not configured on the backend")
+      }
+
+      const baseUrl = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1"
       const response = await fetchWithRetry(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -186,7 +185,17 @@ export const chat = action({
         providerCostUsdMicros: usageCostMicros,
       }
     } catch (err) {
-      throw err
+      const message = err instanceof Error ? err.message : String(err)
+      console.error("AI chat failed:", message)
+      return {
+        content: "",
+        error: message,
+        citations: undefined,
+        model: args.modelRole,
+        creditsCharged: 0,
+        remainingCredits: undefined,
+        providerCostUsdMicros: 0,
+      }
     }
   },
 })
