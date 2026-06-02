@@ -48,6 +48,11 @@ jobs:
           CERT_PATH="$RUNNER_TEMP/developer-id-application.p12"
           printf '%s' "$CSC_LINK_BASE64" | base64 -D > "$CERT_PATH"
           export CSC_LINK="$CERT_PATH"
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json >/dev/null
           npx vue-tsc
           npx vite build
           npx electron-builder --mac dmg zip --universal --publish never
