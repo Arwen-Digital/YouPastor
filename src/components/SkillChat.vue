@@ -20,7 +20,7 @@ import { useSaveSocialCalendar } from '@/composables/useSaveSocialCalendar'
 import { useSaveChurchEmail } from '@/composables/useSaveChurchEmail'
 import { useSaveAnnouncement } from '@/composables/useSaveAnnouncement'
 import { useSaveChurchLetter } from '@/composables/useSaveChurchLetter'
-import type { AIOperation } from '@/lib/ai/types'
+import type { AIOperation, Message } from '@/lib/ai/types'
 import SaveSeriesModal from '@/components/SaveSeriesModal.vue'
 import SaveResearchModal from '@/components/SaveResearchModal.vue'
 import SaveBrainstormModal from '@/components/SaveBrainstormModal.vue'
@@ -556,10 +556,13 @@ function getFullSystemPrompt(): string {
     : currentSystemPrompt.value
 }
 
-function buildChatHistory(): ChatMessage[] {
+function buildChatHistory(): Message[] {
   return [
     { role: 'system', content: getFullSystemPrompt() },
-    ...messages.value,
+    ...messages.value.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
   ]
 }
 
@@ -718,7 +721,7 @@ async function startConversation(userMessage: string) {
   messages.value.push({ role: 'user', content: userMessage })
   scrollToBottom()
 
-  const result = await sendMessage(buildChatHistory() as any, {
+  const result = await sendMessage(buildChatHistory(), {
     operation: 'orchestrator_intake',
     skillSlug: props.skillSlug,
   })
@@ -766,7 +769,7 @@ async function handoffToResearcher() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any, {
+  await streamMessage(buildChatHistory(), {
     operation: 'sermon_research',
     skillSlug: props.skillSlug,
   })
@@ -789,7 +792,7 @@ async function handoffToBriefGenerator() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any, {
+  await streamMessage(buildChatHistory(), {
     operation: 'sermon_brainstorm',
     skillSlug: props.skillSlug,
   })
@@ -811,7 +814,7 @@ async function handoffToYoutubePackager() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any, {
+  await streamMessage(buildChatHistory(), {
     operation: 'sermon_to_youtube',
     skillSlug: props.skillSlug,
   })
@@ -833,7 +836,7 @@ async function handoffToGenerator() {
   messages.value.push({ role: 'user', content: triggerMsg })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any, {
+  await streamMessage(buildChatHistory(), {
     operation: getSkillOperation(),
     skillSlug: props.skillSlug,
   })
@@ -854,7 +857,7 @@ async function handleSend() {
   messages.value.push({ role: 'user', content: text })
   scrollToBottom()
 
-  await streamMessage(buildChatHistory() as any, {
+  await streamMessage(buildChatHistory(), {
     operation: getCurrentChatOperation(),
     skillSlug: props.skillSlug,
   })
@@ -884,7 +887,7 @@ async function handleSaveClick() {
   if (isAnnouncementScript) resetAnnouncementSave()
   if (isChurchLetter) resetChurchLetterSave()
 
-  const extractionMessages: ChatMessage[] = messages.value
+  const extractionMessages: Message[] = messages.value
     .filter(m => m.role !== 'system')
     .map(m => ({ role: m.role, content: m.content }))
 
