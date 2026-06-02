@@ -105,14 +105,14 @@ function extractDeepLink(argv: string[]): string | null {
 function setupAutoUpdater() {
   if (!app.isPackaged) return
 
-  // Auto-download updates on all platforms. The previous Windows manual-download
-  // flow is preserved in the renderer as commented fallback code.
-  autoUpdater.autoDownload = true
+  // Do not download automatically. First show the user that an update is
+  // available; clicking the sidebar notice starts the download on demand.
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
 
   autoUpdater.on('update-available', () => {
     console.log('Update available.')
-    updateStatus = 'downloading'
+    updateStatus = 'available'
     updateProgress = 0
     updateError = null
     emitUpdateState()
@@ -249,6 +249,16 @@ app.whenReady().then(() => {
       progress: updateProgress,
       error: updateError,
     }
+  })
+
+  ipcMain.handle('app:downloadUpdate', async () => {
+    if (updateStatus !== 'available') return { ok: false }
+    updateStatus = 'downloading'
+    updateProgress = 0
+    updateError = null
+    emitUpdateState()
+    await autoUpdater.downloadUpdate()
+    return { ok: true }
   })
 
   ipcMain.handle('app:installUpdate', async () => {

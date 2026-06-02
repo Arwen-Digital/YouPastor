@@ -22,6 +22,7 @@ interface Window {
       progress: number
       error: string | null
     }>
+    downloadUpdate: () => Promise<{ ok: boolean }>
     installUpdate: () => Promise<{ ok: boolean }>
   }
 }

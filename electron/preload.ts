@@ -36,5 +36,6 @@ contextBridge.exposeInMainWorld('appLinks', {
     progress: number
     error: string | null
   }> => ipcRenderer.invoke('app:getUpdateState'),
+  downloadUpdate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:downloadUpdate'),
   installUpdate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:installUpdate'),
 })

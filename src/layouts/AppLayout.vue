@@ -144,6 +144,11 @@ async function installUpdateNow() {
       return
     }
 
+    if (updateStatus.value === 'available') {
+      await window.appLinks?.downloadUpdate?.()
+      return
+    }
+
     // Previous Windows manual-download fallback. Keeping this here so it is easy
     // to restore if Windows auto-install is unreliable for unsigned builds.
     // const isWindows = navigator.userAgent.toLowerCase().includes('win')
