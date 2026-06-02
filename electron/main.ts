@@ -263,7 +263,19 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:installUpdate', async () => {
     if (updateStatus !== 'downloaded') return { ok: false }
-    autoUpdater.quitAndInstall(false, true)
+
+    // On Windows, NSIS can fail with "YouPastor cannot be closed" if the
+    // installer starts before Chromium has fully released the app process.
+    // Hide/destroy the window first, then let electron-updater quit and install.
+    if (process.platform === 'win32' && win && !win.isDestroyed()) {
+      win.hide()
+      win.destroy()
+      win = null
+      setTimeout(() => autoUpdater.quitAndInstall(false, true), 500)
+    } else {
+      autoUpdater.quitAndInstall(false, true)
+    }
+
     return { ok: true }
   })
 

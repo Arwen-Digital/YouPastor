@@ -190,10 +190,9 @@ export const chat = action({
       return {
         content: "",
         error: message,
-        citations: undefined,
+        citations: [],
         model: args.modelRole,
         creditsCharged: 0,
-        remainingCredits: undefined,
         providerCostUsdMicros: 0,
       }
     }
