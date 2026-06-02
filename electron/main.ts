@@ -3,6 +3,7 @@ import { autoUpdater } from 'electron-updater'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import http from 'node:http'
+import fs from 'node:fs'
 import { registerIpcHandlers } from './ipc'
 
 // Starts a one-shot local HTTP server that captures the OAuth callback from the browser.
@@ -53,6 +54,18 @@ let pendingDeepLink: string | null = null
 let updateStatus: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error' = 'idle'
 let updateProgress = 0
 let updateError: string | null = null
+let isQuittingForUpdate = false
+
+function logUpdater(message: string, error?: unknown) {
+  const line = `[${new Date().toISOString()}] ${message}${error ? ` ${error instanceof Error ? error.stack || error.message : String(error)}` : ''}\n`
+  console.log(`[updater] ${message}`, error ?? '')
+
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'updater.log'), line)
+  } catch {
+    // Logging must never break updater behavior.
+  }
+}
 
 function emitUpdateState() {
   win?.webContents.send('app:update-state', {
@@ -110,8 +123,8 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
 
-  autoUpdater.on('update-available', () => {
-    console.log('Update available.')
+  autoUpdater.on('update-available', (info) => {
+    logUpdater(`Update available: ${info.version}`)
     updateStatus = 'available'
     updateProgress = 0
     updateError = null
@@ -119,21 +132,23 @@ function setupAutoUpdater() {
   })
 
   autoUpdater.on('download-progress', (progress) => {
+    logUpdater(`Download progress: ${Math.round(progress.percent ?? 0)}%`)
     updateStatus = 'downloading'
     updateProgress = Math.max(0, Math.min(100, progress.percent ?? 0))
     updateError = null
     emitUpdateState()
   })
 
-  autoUpdater.on('update-downloaded', () => {
+  autoUpdater.on('update-downloaded', (info) => {
+    logUpdater(`Update downloaded: ${info.version}`)
     updateStatus = 'downloaded'
     updateProgress = 100
     updateError = null
     emitUpdateState()
   })
 
-  autoUpdater.on('update-not-available', () => {
-    console.log('No update available.')
+  autoUpdater.on('update-not-available', (info) => {
+    logUpdater(`No update available. Current/latest: ${info.version}`)
     updateStatus = 'idle'
     updateProgress = 0
     updateError = null
@@ -141,12 +156,19 @@ function setupAutoUpdater() {
   })
 
   autoUpdater.on('error', (error) => {
-    console.error('Auto-update error:', error)
+    logUpdater('Auto-update error:', error)
     updateStatus = 'error'
     updateError = error?.message ?? String(error)
     emitUpdateState()
   })
 
+  ;(autoUpdater as any).on('before-quit-for-update', () => {
+    isQuittingForUpdate = true
+    app.removeAllListeners('window-all-closed')
+    logUpdater('before-quit-for-update emitted')
+  })
+
+  logUpdater(`Checking for updates. App version: ${app.getVersion()}, app path: ${app.getPath('exe')}`)
   void autoUpdater.checkForUpdates()
 }
 
@@ -197,6 +219,13 @@ function createWindow() {
 }
 
 app.on('window-all-closed', () => {
+  if (isQuittingForUpdate) {
+    logUpdater('All windows closed while quitting for update')
+    app.quit()
+    win = null
+    return
+  }
+
   if (process.platform !== 'darwin') {
     app.quit()
     win = null
@@ -257,6 +286,7 @@ app.whenReady().then(() => {
     updateProgress = 0
     updateError = null
     emitUpdateState()
+    logUpdater('Manual update download started')
     await autoUpdater.downloadUpdate()
     return { ok: true }
   })
@@ -264,17 +294,33 @@ app.whenReady().then(() => {
   ipcMain.handle('app:installUpdate', async () => {
     if (updateStatus !== 'downloaded') return { ok: false }
 
-    // On Windows, NSIS can fail with "YouPastor cannot be closed" if the
-    // installer starts before Chromium has fully released the app process.
-    // Hide/destroy the window first, then let electron-updater quit and install.
-    if (process.platform === 'win32' && win && !win.isDestroyed()) {
-      win.hide()
-      win.destroy()
-      win = null
-      setTimeout(() => autoUpdater.quitAndInstall(false, true), 500)
-    } else {
-      autoUpdater.quitAndInstall(false, true)
-    }
+    logUpdater(`Manual update install requested on ${process.platform}`)
+
+    setTimeout(() => {
+      try {
+        isQuittingForUpdate = true
+        app.removeAllListeners('window-all-closed')
+
+        if (process.platform === 'win32' && win && !win.isDestroyed()) {
+          // On Windows, NSIS can fail with "YouPastor cannot be closed" if the
+          // installer starts before Chromium has fully released the app process.
+          win.hide()
+          win.destroy()
+          win = null
+          setTimeout(() => autoUpdater.quitAndInstall(false, true), 500)
+          return
+        }
+
+        // On macOS, use the default quitAndInstall() path. Passing NSIS-oriented
+        // flags here is unnecessary and makes the install path harder to reason about.
+        autoUpdater.quitAndInstall()
+      } catch (error) {
+        logUpdater('quitAndInstall failed:', error)
+        updateStatus = 'error'
+        updateError = error instanceof Error ? error.message : String(error)
+        emitUpdateState()
+      }
+    }, 250)
 
     return { ok: true }
   })
@@ -296,5 +342,6 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  logUpdater(`before-quit emitted. isQuittingForUpdate=${isQuittingForUpdate}`)
   win = null
 })
