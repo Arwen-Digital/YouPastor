@@ -50,7 +50,7 @@ app.setName('YouPastor')
 
 let win: BrowserWindow | null
 let pendingDeepLink: string | null = null
-let updateStatus: 'idle' | 'available' | 'error' = 'idle'
+let updateStatus: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error' = 'idle'
 let updateProgress = 0
 let updateError: string | null = null
 
@@ -105,14 +105,29 @@ function extractDeepLink(argv: string[]): string | null {
 function setupAutoUpdater() {
   if (!app.isPackaged) return
 
-  // We only notify about updates; users download installers manually.
-  autoUpdater.autoDownload = false
+  // Auto-download updates on all platforms. The previous Windows manual-download
+  // flow is preserved in the renderer as commented fallback code.
+  autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = false
 
   autoUpdater.on('update-available', () => {
-    console.log('Update available. Downloading...')
-    updateStatus = 'available'
+    console.log('Update available.')
+    updateStatus = 'downloading'
     updateProgress = 0
+    updateError = null
+    emitUpdateState()
+  })
+
+  autoUpdater.on('download-progress', (progress) => {
+    updateStatus = 'downloading'
+    updateProgress = Math.max(0, Math.min(100, progress.percent ?? 0))
+    updateError = null
+    emitUpdateState()
+  })
+
+  autoUpdater.on('update-downloaded', () => {
+    updateStatus = 'downloaded'
+    updateProgress = 100
     updateError = null
     emitUpdateState()
   })
@@ -234,6 +249,12 @@ app.whenReady().then(() => {
       progress: updateProgress,
       error: updateError,
     }
+  })
+
+  ipcMain.handle('app:installUpdate', async () => {
+    if (updateStatus !== 'downloaded') return { ok: false }
+    autoUpdater.quitAndInstall(false, true)
+    return { ok: true }
   })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

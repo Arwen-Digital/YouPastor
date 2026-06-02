@@ -32,8 +32,9 @@ contextBridge.exposeInMainWorld('appLinks', {
   openExternal: (url: string) => ipcRenderer.invoke('external:open', url),
   startCallbackServer: (): Promise<number> => ipcRenderer.invoke('auth:startCallbackServer'),
   getUpdateState: (): Promise<{
-    status: 'idle' | 'available' | 'error'
+    status: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error'
     progress: number
     error: string | null
   }> => ipcRenderer.invoke('app:getUpdateState'),
+  installUpdate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('app:installUpdate'),
 })

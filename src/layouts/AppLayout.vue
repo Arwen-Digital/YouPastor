@@ -33,17 +33,22 @@ const LOW_CREDIT_THRESHOLD = 20
 const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
 const showLowCreditNotice = computed(() => !!auth.user && creditBalance.value <= LOW_CREDIT_THRESHOLD)
 const isAdminUser = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
-const updateStatus = ref<'idle' | 'available' | 'error'>('idle')
+const updateStatus = ref<'idle' | 'available' | 'downloading' | 'downloaded' | 'error'>('idle')
+const updateProgress = ref(0)
 const updateError = ref<string | null>(null)
-const updateBadgeVisible = computed(() => updateStatus.value === 'available' || updateStatus.value === 'error')
-const updateActionable = computed(() => updateStatus.value === 'available')
+const updateBadgeVisible = computed(() => updateStatus.value !== 'idle')
+const updateActionable = computed(() => updateStatus.value === 'available' || updateStatus.value === 'downloaded')
 const updateTitle = computed(() => {
   if (updateStatus.value === 'available') return 'Update available'
+  if (updateStatus.value === 'downloading') return 'Downloading update'
+  if (updateStatus.value === 'downloaded') return 'Update ready'
   if (updateStatus.value === 'error') return 'Update check failed'
   return ''
 })
 const updateSubtitle = computed(() => {
   if (updateStatus.value === 'available') return 'Click here to download'
+  if (updateStatus.value === 'downloading') return `${Math.round(updateProgress.value)}% downloaded`
+  if (updateStatus.value === 'downloaded') return 'Click to restart and install'
   if (updateStatus.value === 'error') return updateError.value ?? 'Please try again later.'
   return ''
 })
@@ -131,26 +136,31 @@ function navigateTo(path: string) {
 }
 
 async function installUpdateNow() {
-  if (updateStatus.value !== 'available') return
-
-  const ua = navigator.userAgent.toLowerCase()
-  const isWindows = ua.includes('win')
-  const downloadUrl = isWindows
-    ? 'https://github.com/Arwen-Digital/YouPastor/releases/latest/download/YouPastor-Windows-Setup.exe'
-    : 'https://github.com/Arwen-Digital/YouPastor/releases/latest/download/YouPastor-Mac-universal-Installer.dmg'
+  if (!updateActionable.value) return
 
   try {
-    await window.appLinks?.openExternal(downloadUrl)
+    if (updateStatus.value === 'downloaded') {
+      await window.appLinks?.installUpdate?.()
+      return
+    }
+
+    // Previous Windows manual-download fallback. Keeping this here so it is easy
+    // to restore if Windows auto-install is unreliable for unsigned builds.
+    // const isWindows = navigator.userAgent.toLowerCase().includes('win')
+    // if (isWindows) {
+    //   await window.appLinks?.openExternal('https://github.com/Arwen-Digital/YouPastor/releases/latest/download/YouPastor-Windows-Setup.exe')
+    // }
   } catch (err) {
-    console.warn('[update] Failed to open download link', err)
+    console.warn('[update] Failed to handle update action', err)
     updateStatus.value = 'error'
-    updateError.value = 'Could not open download link. Please visit youpastor.com/download.'
+    updateError.value = 'Could not process the update. Please visit youpastor.com/download.'
   }
 }
 
 function applyUpdateState(payload: any) {
   if (!payload) return
   updateStatus.value = payload.status ?? 'idle'
+  updateProgress.value = payload.progress ?? 0
   updateError.value = payload.error ?? null
 }
 
