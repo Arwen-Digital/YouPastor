@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Send, ArrowLeft, Loader2, BookOpen, Copy, Check } from 'lucide-vue-next'
 import { marked } from 'marked'
 import { useAI } from '@/composables/useAI'
+import { useAuthStore } from '@/stores/auth'
 import { buildSystemPrompt, buildContextBlock, type ChurchContext } from '@/lib/skills'
 import { useConvexQuery } from '@/composables/useConvexQuery'
 import { useSaveSeries } from '@/composables/useSaveSeries'
@@ -119,9 +120,11 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const auth = useAuthStore()
+const showModelDebug = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
 // All skill intake starts on the orchestrator model. Coded handoffs switch to the
 // final-generation model: researcher for research/brainstorm, generator for the rest.
-const { isLoading, streamingContent, error, streamMessage, sendMessage, citations, role, setRole } = useAI('orchestrator')
+const { isLoading, streamingContent, error, streamMessage, sendMessage, citations, lastModel, role, setRole } = useAI('orchestrator')
 
 // Determine which save flow to use based on skill
 const isSeriesPlanner = props.skillSlug === 'sermon-series'
@@ -315,6 +318,7 @@ const showSaveModal = ref(false)
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
+  model?: string
 }
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -662,8 +666,8 @@ function looksLikeFinalSocialDeliverable(content: string): boolean {
   return content.length > 500 && (hasSocialSections || hasCalendarSections || hasChurchEmailSections || hasAnnouncementSections || hasChurchLetterSections)
 }
 
-async function handleAssistantResponse(responseContent: string) {
-  messages.value.push({ role: 'assistant', content: responseContent })
+async function handleAssistantResponse(responseContent: string, model?: string) {
+  messages.value.push({ role: 'assistant', content: responseContent, model: model || lastModel.value || undefined })
 
   // Detect intake handoff and automatically switch to researcher
   if (isSermonResearch && role.value === 'orchestrator' && responseContent.includes('RESEARCH_READY:')) {
@@ -720,7 +724,7 @@ async function startConversation(userMessage: string) {
   })
 
   if (result) {
-    await handleAssistantResponse(result.content)
+    await handleAssistantResponse(result.content, result.model)
   }
 
   scrollToBottom()
@@ -768,7 +772,7 @@ async function handoffToResearcher() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value })
+    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
   }
 
   scrollToBottom()
@@ -791,7 +795,7 @@ async function handoffToBriefGenerator() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value })
+    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
   }
 
   scrollToBottom()
@@ -813,7 +817,7 @@ async function handoffToYoutubePackager() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value })
+    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
   }
 
   scrollToBottom()
@@ -835,7 +839,7 @@ async function handoffToGenerator() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value })
+    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
   }
 
   scrollToBottom()
@@ -856,7 +860,7 @@ async function handleSend() {
   })
 
   if (streamingContent.value) {
-    await handleAssistantResponse(streamingContent.value)
+    await handleAssistantResponse(streamingContent.value, lastModel.value)
   }
 
   scrollToBottom()
@@ -1220,6 +1224,9 @@ function handleSaveModalClose() {
             <Check v-if="copiedIndex === i" class="h-3.5 w-3.5 text-emerald-600" />
             <Copy v-else class="h-3.5 w-3.5" />
           </button>
+          <div v-if="showModelDebug && msg.model" class="mt-1 px-1 text-[10px] font-mono text-muted-foreground/70">
+            {{ msg.model }}
+          </div>
         </div>
       </div>
 

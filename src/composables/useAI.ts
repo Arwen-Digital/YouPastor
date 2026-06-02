@@ -15,6 +15,7 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
   const error: Ref<Error | null> = ref(null)
   const streamingContent = ref('')
   const citations = ref<string[]>([])
+  const lastModel = ref('')
 
   const role = ref<AIRole>(initialRole)
 
@@ -56,6 +57,8 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
         remainingCredits: actionResult?.remainingCredits,
         providerCostUsdMicros: actionResult?.providerCostUsdMicros,
       }
+
+      lastModel.value = result.model
 
       if (typeof actionResult?.remainingCredits === 'number') {
         auth.setCreditBalance(actionResult.remainingCredits)
@@ -124,6 +127,7 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
     error,
     streamingContent,
     citations,
+    lastModel,
     role,
     setRole,
     sendMessage,
