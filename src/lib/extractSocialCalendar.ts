@@ -6,6 +6,10 @@ function inferTitle(content: string): string {
   return 'Social Media Calendar'
 }
 
+function hasCalendarTable(content: string): boolean {
+  return /\|\s*Date\s*\|\s*Day\s*\|\s*Platform\s*\|\s*Post Type\s*\|/i.test(content)
+}
+
 export function extractSocialCalendarFromConversation(messages: Message[]): { title: string; content: string } | null {
   const assistantMessages = messages
     .filter((m) => m.role === 'assistant' && m.content.trim().length > 0)
@@ -13,7 +17,8 @@ export function extractSocialCalendarFromConversation(messages: Message[]): { ti
 
   if (!assistantMessages.length) return null
 
-  const candidate = assistantMessages.sort((a, b) => b.length - a.length)[0]
+  const candidateWithTable = [...assistantMessages].reverse().find(hasCalendarTable)
+  const candidate = candidateWithTable ?? assistantMessages.sort((a, b) => b.length - a.length)[0]
   if (!candidate) return null
 
   return {

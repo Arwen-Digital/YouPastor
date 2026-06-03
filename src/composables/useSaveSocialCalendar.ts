@@ -11,6 +11,11 @@ export interface SocialCalendarPreview {
   content: string
 }
 
+function hasSocialCalendarTable(content?: string | null): boolean {
+  if (!content) return false
+  return /\|\s*Date\s*\|\s*Day\s*\|\s*Platform\s*\|\s*Post Type\s*\|/i.test(content)
+}
+
 export function useSaveSocialCalendar() {
   const status: Ref<SaveStatus> = ref('idle')
   const preview: Ref<SocialCalendarPreview | null> = ref(null)
@@ -35,6 +40,9 @@ Return ONLY valid JSON with this exact shape:
 
 Rules:
 - content must include only final calendar deliverables the pastor should keep
+- Preserve Markdown formatting exactly, especially the social media calendar table
+- The content string should include the Markdown table with columns: Date, Day, Platform, Post Type, Topic and Content Idea, CTA
+- Do NOT convert the Markdown table into prose, bullet points, CSV, or plain text rows
 - Do NOT include intake Q&A, clarifications, revision chatter, or stage instructions
 - Do NOT include markdown code fences around JSON
 - If multiple drafts exist, choose the latest complete final version
@@ -57,7 +65,10 @@ ${messages.filter(m => m.role !== 'system').map(m => `${m.role.toUpperCase()}: $
         extracted = null
       }
 
-      if (!extracted?.content) extracted = extractSocialCalendarFromConversation(messages)
+      if (!hasSocialCalendarTable(extracted?.content)) {
+        const directExtraction = extractSocialCalendarFromConversation(messages)
+        if (directExtraction?.content) extracted = directExtraction
+      }
 
       if (!extracted?.content) {
         throw new Error('Could not find completed Social Media Calendar output in the conversation.')
