@@ -1,18 +1,22 @@
 import { action } from "../_generated/server"
+import { v } from "convex/values"
 import { api } from "../_generated/api"
 import { getAuthUserId } from "@convex-dev/auth/server"
 
 const BREVO_LIST_ID = 11
 
 export const syncBrevoContact = action({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    name: v.optional(v.string()),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
     if (!userId) throw new Error("Not authenticated")
 
     const existing = await ctx.runQuery(api.users.queries.getBrevoContact, {})
-    if (existing) {
-      return { ok: true, skipped: true }
+    if (existing && !args.force) {
+      return { ok: true, skipped: true, reason: "already_synced" }
     }
 
     const me = await ctx.runQuery(api.users.queries.getMe, {})
@@ -23,10 +27,10 @@ export const syncBrevoContact = action({
       return { ok: false, skipped: true, reason: "missing_email" }
     }
 
-    const fallbackName = String(me?.name ?? "").trim()
+    const fallbackName = String(args.name ?? me?.name ?? "").trim()
     const nameParts = fallbackName ? fallbackName.split(/\s+/) : []
-    const firstName = String(profile?.pastorFirstName ?? nameParts[0] ?? "").trim()
-    const lastName = String(profile?.pastorLastName ?? nameParts.slice(1).join(" ") ?? "").trim()
+    const firstName = String(profile?.pastorFirstName || nameParts[0] || "").trim()
+    const lastName = String(profile?.pastorLastName || nameParts.slice(1).join(" ") || "").trim()
 
     const brevoApiKey = process.env.BREVO_API_KEY
     if (!brevoApiKey) {

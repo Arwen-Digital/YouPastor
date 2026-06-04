@@ -104,7 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data as AuthUser
         isAuthenticated.value = true
 
-        void client.action('users/actions:syncBrevoContact' as any, {}).catch((err: any) => {
+        void syncBrevoContact().catch((err: any) => {
           console.warn('[brevo] Failed to sync contact:', err?.message || String(err))
         })
       } else {
@@ -321,6 +321,12 @@ export const useAuthStore = defineStore('auth', () => {
         console.warn('[auth] Profile creation failed:', profileErr?.message)
       }
 
+      try {
+        await syncBrevoContact({ name, force: true })
+      } catch (brevoErr: any) {
+        console.warn('[brevo] Signup contact sync failed:', brevoErr?.message || String(brevoErr))
+      }
+
       await fetchUser()
       return isAuthenticated.value
     } catch (err: any) {
@@ -330,6 +336,26 @@ export const useAuthStore = defineStore('auth', () => {
       return false
     } finally {
       isLoading.value = false
+    }
+  }
+
+  async function syncBrevoContact(options: { name?: string; force?: boolean } = {}): Promise<void> {
+    const client = getConvexClient()
+    const args: { name?: string; force?: boolean } = {}
+    if (options.name !== undefined) args.name = options.name
+    if (options.force !== undefined) args.force = options.force
+
+    const result = await retry(
+      () =>
+        withTimeout(
+          client.action('users/actions:syncBrevoContact' as any, args),
+          'Brevo contact sync'
+        ),
+      { maxAttempts: 3, delayMs: 500 }
+    )
+
+    if (result?.ok === false) {
+      console.warn('[brevo] Contact sync did not complete:', result)
     }
   }
 
