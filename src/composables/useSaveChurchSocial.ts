@@ -11,6 +11,11 @@ export interface ChurchSocialPreview {
   content: string
 }
 
+function hasSocialPostFormatting(content?: string | null): boolean {
+  if (!content) return false
+  return /###\s+(Facebook|Instagram|Twitter\/X|Twitter)/i.test(content) || /^>\s+.+/m.test(content)
+}
+
 export function useSaveChurchSocial() {
   const status: Ref<SaveStatus> = ref('idle')
   const preview: Ref<ChurchSocialPreview | null> = ref(null)
@@ -35,6 +40,8 @@ Return ONLY valid JSON with this exact shape:
 
 Rules:
 - content must include only final deliverables the pastor should keep (post type selection, platform captions, image suggestions, and posting tip if present)
+- Preserve the Markdown formatting exactly from the chat, especially platform headings, blockquoted captions, bullets, bold labels, and posting tip italics
+- Do NOT convert formatted captions into plain paragraphs or remove Markdown blockquotes
 - Do NOT include intake Q&A, clarifications, revisions chatter, or staging instructions
 - Do NOT include markdown code fences around JSON
 - If there are multiple drafts, pick the latest complete final version
@@ -57,7 +64,10 @@ ${messages.filter(m => m.role !== 'system').map(m => `${m.role.toUpperCase()}: $
         extracted = null
       }
 
-      if (!extracted?.content) extracted = extractChurchSocialFromConversation(messages)
+      if (!hasSocialPostFormatting(extracted?.content)) {
+        const directExtraction = extractChurchSocialFromConversation(messages)
+        if (directExtraction?.content) extracted = directExtraction
+      }
 
       if (!extracted?.content) {
         throw new Error('Could not find completed Church Social Post output in the conversation.')

@@ -2063,7 +2063,7 @@ const filteredList = computed(() => {
             </div>
           </div>
 
-          <div v-if="churchSocialDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground">
+          <div v-if="churchSocialDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground prose-blockquote:my-3 prose-blockquote:rounded-lg prose-blockquote:border-l-4 prose-blockquote:border-pink-300 prose-blockquote:bg-pink-50/60 prose-blockquote:px-4 prose-blockquote:py-3 prose-blockquote:not-italic prose-blockquote:text-slate-700">
             <div v-html="marked.parse(churchSocialDetail.content)" />
           </div>
 

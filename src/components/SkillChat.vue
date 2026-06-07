@@ -349,7 +349,7 @@ function copyToClipboard(text: string, index: number) {
 // Load church profile from Convex
 const { result: churchProfile } = useConvexQuery('profile/queries:getMine' as any)
 
-// Recent saved sermons for sermon-to-blog intake
+// Recent saved sermons for sermon-seeded skill intake
 const { result: recentSermons, isLoading: recentSermonsLoading } = useConvexQuery(
   'sermons/queries:listRecent' as any,
   { limit: 4 }
@@ -547,7 +547,7 @@ watch(streamingContent, () => scrollToBottom())
 watch(isLoading, (loading) => { if (loading) scrollToBottom() })
 watch(() => messages.value.length, () => scrollToBottom())
 
-const showSourceChooser = computed(() => (isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions) && !hasStartedConversation.value)
+const showSourceChooser = computed(() => (isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost) && !hasStartedConversation.value)
 
 function getFullSystemPrompt(): string {
   const contextBlocks = [selectedSermonContext.value, selectedBlogContext.value].filter(Boolean)
@@ -584,7 +584,9 @@ function buildSermonContext(sermon: any): string {
 
   const usageInstruction = isSmallGroupQuestions
     ? 'The pastor selected this saved sermon for the Small Group Questions skill. Use it as the source material and move directly into building discussion-ready prompts. Do NOT ask what they preached on Sunday unless the saved content is missing.'
-    : 'The pastor selected this saved sermon for the Sermon to Blog skill. Use it as the sermon source material. Do NOT ask what they preached on Sunday unless the saved content is missing. Move to the next most useful blog-building question, such as the one sentence they want readers to remember, the strongest illustration, the concrete application, or the SEO/search angle.'
+    : isChurchSocialPost
+      ? 'The pastor selected this saved sermon for the Church Social Post skill. Use it as the source material for creating a church social post. Do NOT ask what they preached on Sunday unless the saved content is missing. Move to the next most useful social-post question, such as platform, audience, tone, desired call to action, or whether they want a quote, invite, recap, or engagement post.'
+      : 'The pastor selected this saved sermon for the Sermon to Blog skill. Use it as the sermon source material. Do NOT ask what they preached on Sunday unless the saved content is missing. Move to the next most useful blog-building question, such as the one sentence they want readers to remember, the strongest illustration, the concrete application, or the SEO/search angle.'
 
   return `## Selected Sermon From Database
 
@@ -740,6 +742,10 @@ async function handleSermonSelect(sermon: any) {
     await startConversation(`I'd like to create small group questions from my saved sermon "${sermon.title || 'Untitled sermon'}".`)
     return
   }
+  if (isChurchSocialPost) {
+    await startConversation(`I'd like to create a church social post from my saved sermon "${sermon.title || 'Untitled sermon'}".`)
+    return
+  }
   await startConversation(`I'd like to turn my saved sermon "${sermon.title || 'Untitled sermon'}" into a blog post.`)
 }
 
@@ -754,7 +760,7 @@ async function handleStartWithoutSavedSource() {
 }
 
 onMounted(async () => {
-  if (isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions) return
+  if (isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost) return
   await startConversation(props.initialMessage)
 })
 
@@ -1103,9 +1109,15 @@ function handleSaveModalClose() {
 
     <div ref="messagesContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
       <div v-if="showSourceChooser" class="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
-        <template v-if="isSermonToBlog || isSmallGroupQuestions">
+        <template v-if="isSermonToBlog || isSmallGroupQuestions || isChurchSocialPost">
           <div class="space-y-1">
-            <h3 class="text-sm font-semibold text-foreground">{{ isSmallGroupQuestions ? 'Choose a sermon to build small group questions' : 'Choose a sermon to turn into a blog post' }}</h3>
+            <h3 class="text-sm font-semibold text-foreground">
+              {{ isSmallGroupQuestions
+                ? 'Choose a sermon to build small group questions'
+                : isChurchSocialPost
+                  ? 'Choose a sermon to turn into a church social post'
+                  : 'Choose a sermon to turn into a blog post' }}
+            </h3>
             <p class="text-xs text-muted-foreground">Select one of your 4 most recent saved sermons, or start without a saved sermon.</p>
           </div>
 
@@ -1150,7 +1162,7 @@ function handleSaveModalClose() {
             :disabled="isLoading"
             class="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
-            {{ isSmallGroupQuestions ? 'Start without a saved sermon (paste notes instead)' : 'Start without a saved sermon' }}
+            {{ isSmallGroupQuestions || isChurchSocialPost ? 'Start without a saved sermon (paste notes instead)' : 'Start without a saved sermon' }}
           </button>
         </template>
 

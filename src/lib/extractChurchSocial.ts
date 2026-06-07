@@ -6,6 +6,22 @@ function inferTitle(content: string): string {
   return 'Church Social Post'
 }
 
+function hasPlatformCaptionFormatting(content: string): boolean {
+  return (
+    /###\s+(Facebook|Instagram|Twitter\/X|Twitter)/i.test(content) ||
+    /^>\s+.+/m.test(content)
+  )
+}
+
+function hasFinalSocialFormatting(content: string): boolean {
+  return (
+    hasPlatformCaptionFormatting(content) ||
+    content.includes('**Selected post type:**') ||
+    content.includes('**Image') ||
+    content.includes('**Posting Tip')
+  )
+}
+
 export function extractChurchSocialFromConversation(messages: Message[]): { title: string; content: string } | null {
   const assistantMessages = messages
     .filter((m) => m.role === 'assistant' && m.content.trim().length > 0)
@@ -13,14 +29,11 @@ export function extractChurchSocialFromConversation(messages: Message[]): { titl
 
   if (!assistantMessages.length) return null
 
-  const stageLike = assistantMessages.find((m) =>
-    m.includes('### Facebook') ||
-    m.includes('### Instagram') ||
-    m.includes('### Twitter') ||
-    m.includes('**Selected post type:**')
-  )
-
-  const candidate = stageLike ?? assistantMessages.sort((a, b) => b.length - a.length)[0]
+  // Prefer the latest formatted caption output from the actual chat. This keeps
+  // Markdown headings, blockquotes, bullets, and image/posting-tip sections intact.
+  const latestPlatformCaptions = [...assistantMessages].reverse().find(hasPlatformCaptionFormatting)
+  const latestFormattedOutput = [...assistantMessages].reverse().find(hasFinalSocialFormatting)
+  const candidate = latestPlatformCaptions ?? latestFormattedOutput ?? assistantMessages.sort((a, b) => b.length - a.length)[0]
 
   if (!candidate) return null
 
