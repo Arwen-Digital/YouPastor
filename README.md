@@ -6,6 +6,12 @@ The app is built as a Vue/Electron desktop application backed by Convex and Open
 
 > YouPastor is designed to assist pastors, not replace pastoral judgment, prayer, study, or care.
 
+## Website
+
+Visit **[youpastor.com](https://youpastor.com)** to learn more about YouPastor, download the latest desktop app, and see how it can support sermon preparation, church communication, and weekly pastoral workflows.
+
+If you are a pastor looking for a practical AI assistant for ministry work, start at **[https://youpastor.com](https://youpastor.com)**.
+
 ## Features
 
 - **Sermon Prep**
@@ -188,11 +194,7 @@ npx vue-tsc --noEmit
 
 Installers are built through GitHub Actions using `.github/workflows/build-installers.yml`.
 
-The release flow is tag-based. The helper script is:
-
-```bash
-./scripts/trigger-release-tag.local.sh
-```
+The release flow is tag-based.
 
 Production macOS releases require Apple Developer signing and notarization secrets configured in GitHub Actions. Windows builds produce an NSIS installer.
 
