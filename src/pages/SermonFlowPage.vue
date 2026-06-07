@@ -329,11 +329,6 @@ function clearHighlight() {
   editor.value?.chain().focus().unsetHighlight().run()
 }
 
-function clearSelectedResource() {
-  selectedBrainstorm.value = null
-  selectedResearch.value = null
-}
-
 function selectBrainstorm(brief: any) {
   selectedBrainstorm.value = brief
 }
@@ -485,25 +480,25 @@ async function handleSave() {
             <div class="flex rounded-lg bg-muted p-1">
               <button
                 v-if="resourceSeriesId"
-                @click="activeTab = 'series'; clearSelectedResource()"
+                @click="activeTab = 'series'"
                 :class="['resource-tab', activeTab === 'series' ? 'resource-tab-active' : '']"
               >
                 Series Details
               </button>
               <button
-                @click="activeTab = 'brainstorm'; clearSelectedResource()"
+                @click="activeTab = 'brainstorm'"
                 :class="['resource-tab', activeTab === 'brainstorm' ? 'resource-tab-active' : '']"
               >
                 Brainstorm
               </button>
               <button
-                @click="activeTab = 'research'; clearSelectedResource()"
+                @click="activeTab = 'research'"
                 :class="['resource-tab', activeTab === 'research' ? 'resource-tab-active' : '']"
               >
                 Research
               </button>
               <button
-                @click="activeTab = 'assist'; clearSelectedResource()"
+                @click="activeTab = 'assist'"
                 :class="['resource-tab', activeTab === 'assist' ? 'resource-tab-active' : '']"
               >
                 Sermon Assist
