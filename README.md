@@ -190,21 +190,6 @@ This runs type checking, builds the Vite frontend, builds Electron files, and in
 npx vue-tsc --noEmit
 ```
 
-## Desktop Releases
-
-Installers are built through GitHub Actions using `.github/workflows/build-installers.yml`.
-
-The release flow is tag-based.
-
-Production macOS releases require Apple Developer signing and notarization secrets configured in GitHub Actions. Windows builds produce an NSIS installer.
-
-Expected release assets include:
-
-- `YouPastor-Mac-universal-Installer.dmg`
-- `YouPastor-Mac-universal-Installer.zip`
-- `YouPastor-Windows-Setup.exe`
-- updater metadata files such as `latest.yml`, `latest-mac.yml`, and blockmaps
-
 ## Security and Secrets
 
 Do not commit API keys, signing certificates, app-specific passwords, Convex deployment secrets, billing secrets, or provider credentials.
