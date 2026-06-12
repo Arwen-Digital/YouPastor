@@ -419,12 +419,16 @@ const currentSystemPrompt = ref(
   isSermonResearch ? intakePrompt.value
   : isSermonBrainstorm ? brainstormIntakePrompt.value
   : isSermonToYoutube ? youtubeIntakePrompt.value
-  : isSmallGroupQuestions ? baseSystemPrompt.value
+  : (isSmallGroupQuestions || isSermonCompanion) ? baseSystemPrompt.value
   : genericIntakePrompt.value
 )
 
-if (isSmallGroupQuestions) {
+if (isSmallGroupQuestions || isSermonCompanion) {
   isIntakePhase.value = false
+}
+
+if (isSermonCompanion) {
+  setRole(props.aiRole ?? 'generator')
 }
 
 // Update system prompt when church profile loads or changes
@@ -692,7 +696,7 @@ async function handleAssistantResponse(responseContent: string, model?: string) 
   }
 
   // Generic intake handoff: final generation uses generator for all remaining skills.
-  if (!isSermonResearch && !isSermonBrainstorm && !isSermonToYoutube && !isSmallGroupQuestions && isIntakePhase.value && responseContent.includes('SKILL_READY:')) {
+  if (!isSermonResearch && !isSermonBrainstorm && !isSermonToYoutube && !isSmallGroupQuestions && !isSermonCompanion && isIntakePhase.value && responseContent.includes('SKILL_READY:')) {
     await handoffToGenerator()
     return
   }
