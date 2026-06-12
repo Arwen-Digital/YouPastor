@@ -1834,7 +1834,7 @@ const filteredList = computed(() => {
 
           <!-- Markdown content -->
           <div v-if="brainstormDetail.content" class="rounded-lg border border-border bg-card p-6 prose prose-sm prose-slate max-w-none prose-headings:mt-6 prose-headings:mb-3 prose-h2:text-lg prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold prose-p:my-2 prose-p:text-sm prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-li:text-sm prose-strong:text-foreground prose-table:my-3 prose-table:text-sm prose-th:px-3 prose-th:py-2 prose-th:bg-muted/50 prose-th:font-medium prose-td:px-3 prose-td:py-1.5 prose-td:border-t prose-td:border-border">
-            <div v-html="marked.parse(brainstormDetail.content)" />
+            <div @click="handleMarkdownClick" v-html="marked.parse(brainstormDetail.content)" />
           </div>
 
           <!-- Metadata -->

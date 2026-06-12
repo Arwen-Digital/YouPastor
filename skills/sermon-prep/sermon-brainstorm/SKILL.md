@@ -155,7 +155,19 @@ Go beyond what was discussed. Add theological depth, unexpected connections, and
 
 ---
 *This brief is a launchpad, not a script. Take it to prayer and make it yours.*
+
+## References
+
+[1] [Source title or domain](https://example.com/source-url)
+[2] [Source title or domain](https://example.com/source-url)
 ```
+
+## References Footer Requirements
+
+- If you cite sources inline using numbers like `[1]`, `[2]`, or `[3]`, always include a final `## References` section.
+- Every numbered citation used in the body must have a matching numbered Markdown link with the full source URL.
+- Do not include bare citation numbers unless the matching source appears in the footer.
+- Do not invent source URLs. If a source URL is unavailable, do not use a numbered citation for it.
 
 ---
 

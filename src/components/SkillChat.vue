@@ -84,6 +84,8 @@ NEVER produce the sermon brief yourself. Your only job is intake.`
 
 const RESEARCHER_HANDOFF_NOTE = `\n\nIMPORTANT: The conversation below already contains the pastor's passage and context (marked by RESEARCH_READY). Do not ask follow-up questions. Produce the full 7-section research output immediately based on the information shared.\n\nCITATION REQUIREMENT: If you include numbered citations like [1], [2], or [3] in the research body, you must include a final ## References section. Every numbered citation used in the body must have a matching numbered Markdown link with the full source URL. Do not use citation numbers without a matching source URL in the References footer.`
 
+const BRAINSTORM_RESEARCHER_HANDOFF_NOTE = `\n\nCITATION REQUIREMENT: If you include numbered citations like [1], [2], or [3] in the sermon brief, you must include a final ## References section. Every numbered citation used in the body must have a matching numbered Markdown link with the full source URL. Do not use citation numbers without a matching source URL in the References footer.`
+
 const YOUTUBE_INTAKE_PROMPT = `You are a conversational intake assistant for the Sermon to YouTube skill.
 
 Your goal is to gather only the minimum details needed before full YouTube package generation.
@@ -329,6 +331,7 @@ const userInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const selectedSermonContext = ref('')
 const selectedSermonId = ref<string | null>(null)
+const selectedBrainstormContext = ref('')
 const selectedBlogContext = ref('')
 const selectedBlogId = ref<string | null>(null)
 const hasStartedConversation = ref(false)
@@ -354,6 +357,12 @@ const { result: churchProfile } = useConvexQuery('profile/queries:getMine' as an
 const { result: recentSermons, isLoading: recentSermonsLoading } = useConvexQuery(
   'sermons/queries:listRecent' as any,
   { limit: 4 }
+)
+
+// Recent brainstorm briefs for sermon research intake
+const { result: recentBrainstorms, isLoading: recentBrainstormsLoading } = useConvexQuery(
+  'brainstorm/queries:listMine' as any,
+  {}
 )
 
 // Recent blog posts for sermon-to-youtube intake
@@ -568,7 +577,7 @@ function normalizeReferencesFooter(content: string): string {
 }
 
 function appendReferencesFooter(content: string, responseCitations?: string[]): string {
-  if (!isSermonResearch) return content
+  if (!isSermonResearch && !isSermonBrainstorm) return content
 
   const normalizedContent = normalizeReferencesFooter(content)
   if (normalizedContent !== content) return normalizedContent
@@ -622,7 +631,7 @@ watch(() => messages.value.length, () => scrollToBottom())
 const showSourceChooser = computed(() => (isSermonResearch || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost) && !hasStartedConversation.value)
 
 function getFullSystemPrompt(): string {
-  const contextBlocks = [selectedSermonContext.value, selectedBlogContext.value].filter(Boolean)
+  const contextBlocks = [selectedSermonContext.value, selectedBrainstormContext.value, selectedBlogContext.value].filter(Boolean)
   return contextBlocks.length
     ? `${currentSystemPrompt.value}\n\n---\n\n${contextBlocks.join('\n\n---\n\n')}`
     : currentSystemPrompt.value
@@ -654,9 +663,7 @@ function buildSermonContext(sermon: any): string {
     ? content.slice(0, maxContentChars) + (content.length > maxContentChars ? '\n\n[Content truncated for prompt length.]' : '')
     : 'No sermon content is saved for this sermon. Use the metadata below and ask the pastor for the outline, transcript, or notes.'
 
-  const usageInstruction = isSermonResearch
-    ? 'The pastor selected this saved sermon for the Sermon Research skill. Use it as the research context. Do NOT ask what sermon, passage, or topic they are working on unless the saved content is missing. Move to the next most useful research-intake question, such as the research angle, historical/cultural background, theological issue, illustration need, or practical application they want explored.'
-    : isSmallGroupQuestions
+  const usageInstruction = isSmallGroupQuestions
       ? 'The pastor selected this saved sermon for the Small Group Questions skill. Use it as the source material and move directly into building discussion-ready prompts. Do NOT ask what they preached on Sunday unless the saved content is missing.'
       : isChurchSocialPost
         ? 'The pastor selected this saved sermon for the Church Social Post skill. Use it as the source material for creating a church social post. Do NOT ask what they preached on Sunday unless the saved content is missing. Move to the next most useful social-post question, such as platform, audience, tone, desired call to action, or whether they want a quote, invite, recap, or engagement post.'
@@ -818,10 +825,6 @@ async function startConversation(userMessage: string) {
 async function handleSermonSelect(sermon: any) {
   selectedSermonId.value = sermon._id
   selectedSermonContext.value = buildSermonContext(sermon)
-  if (isSermonResearch) {
-    await startConversation(`I'd like to research from my saved sermon "${sermon.title || 'Untitled sermon'}".`)
-    return
-  }
   if (isSmallGroupQuestions) {
     await startConversation(`I'd like to create small group questions from my saved sermon "${sermon.title || 'Untitled sermon'}".`)
     return
@@ -831,6 +834,31 @@ async function handleSermonSelect(sermon: any) {
     return
   }
   await startConversation(`I'd like to turn my saved sermon "${sermon.title || 'Untitled sermon'}" into a blog post.`)
+}
+
+function buildBrainstormContext(brief: any): string {
+  const content = brief.content?.trim()
+  const maxContentChars = 20000
+  const briefContent = content
+    ? content.slice(0, maxContentChars) + (content.length > maxContentChars ? '\n\n[Content truncated for prompt length.]' : '')
+    : 'No brainstorm content is saved for this brief. Use the metadata below and ask the pastor for any missing research context.'
+
+  return `## Selected Brainstorm Brief From Database
+
+The pastor selected this saved brainstorm brief for the Sermon Research skill. Use it as the research context. Do NOT ask what sermon, passage, or topic they are working on unless the saved brainstorm content is missing. Move to the next most useful research-intake question, such as the research angle, historical/cultural background, theological issue, illustration need, or practical application they want explored.
+
+Passage: ${brief.passage || 'Not provided'}
+Big Idea: ${brief.bigIdea || 'Not provided'}
+Status: ${brief.status || 'Not provided'}
+Created: ${formatDate(brief.createdAt)}
+
+Brainstorm content:
+${briefContent}`
+}
+
+async function handleBrainstormSelect(brief: any) {
+  selectedBrainstormContext.value = buildBrainstormContext(brief)
+  await startConversation(`I'd like to do sermon research based on my saved brainstorm brief "${brief.passage || brief.bigIdea || 'Untitled brainstorm'}".`)
 }
 
 async function handleBlogSelect(blog: any) {
@@ -876,7 +904,7 @@ async function handoffToResearcher() {
 async function handoffToBriefGenerator() {
   isIntakePhase.value = false
   setRole('researcher')
-  currentSystemPrompt.value = baseSystemPrompt.value
+  currentSystemPrompt.value = baseSystemPrompt.value + BRAINSTORM_RESEARCHER_HANDOFF_NOTE
 
   // Add a user message to trigger the brief generation
   const triggerMsg = 'Please generate the Expanded Sermon Brief now.'
@@ -1197,16 +1225,65 @@ function handleSaveModalClose() {
 
     <div ref="messagesContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
       <div v-if="showSourceChooser" class="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
-        <template v-if="isSermonResearch || isSermonToBlog || isSmallGroupQuestions || isChurchSocialPost">
+        <template v-if="isSermonResearch">
+          <div class="space-y-1">
+            <h3 class="text-sm font-semibold text-foreground">Choose a brainstorm brief to research</h3>
+            <p class="text-xs text-muted-foreground">Select one of your recent saved brainstorm briefs, or start without a saved brainstorm.</p>
+          </div>
+
+          <div v-if="recentBrainstormsLoading" class="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-3 text-sm text-muted-foreground">
+            <Loader2 class="h-4 w-4 animate-spin" />
+            Loading recent brainstorms...
+          </div>
+
+          <div v-else-if="recentBrainstorms?.length" class="grid gap-2">
+            <button
+              v-for="brief in recentBrainstorms.slice(0, 4)"
+              :key="brief._id"
+              @click="handleBrainstormSelect(brief)"
+              :disabled="isLoading"
+              class="group w-full rounded-xl border border-border bg-background p-4 text-left transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 space-y-1">
+                  <div class="text-sm font-medium text-foreground truncate">{{ brief.passage || brief.bigIdea || 'Untitled brainstorm' }}</div>
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span v-if="brief.bigIdea">{{ brief.bigIdea }}</span>
+                    <span v-if="brief.bigIdea">•</span>
+                    <span>{{ formatDate(brief.createdAt) }}</span>
+                  </div>
+                  <p v-if="brief.content" class="text-xs text-muted-foreground line-clamp-2 pt-1">
+                    {{ brief.content.slice(0, 180) }}{{ brief.content.length > 180 ? '...' : '' }}
+                  </p>
+                </div>
+                <span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground capitalize group-hover:bg-primary/10 group-hover:text-primary">
+                  {{ brief.status }}
+                </span>
+              </div>
+            </button>
+          </div>
+
+          <div v-else class="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+            No saved brainstorm briefs found yet. You can still start research from scratch.
+          </div>
+
+          <button
+            @click="handleStartWithoutSavedSource"
+            :disabled="isLoading"
+            class="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            Start without a saved brainstorm
+          </button>
+        </template>
+
+        <template v-else-if="isSermonToBlog || isSmallGroupQuestions || isChurchSocialPost">
           <div class="space-y-1">
             <h3 class="text-sm font-semibold text-foreground">
-              {{ isSermonResearch
-                ? 'Choose a sermon to research'
-                : isSmallGroupQuestions
-                  ? 'Choose a sermon to build small group questions'
-                  : isChurchSocialPost
-                    ? 'Choose a sermon to turn into a church social post'
-                    : 'Choose a sermon to turn into a blog post' }}
+              {{ isSmallGroupQuestions
+                ? 'Choose a sermon to build small group questions'
+                : isChurchSocialPost
+                  ? 'Choose a sermon to turn into a church social post'
+                  : 'Choose a sermon to turn into a blog post' }}
             </h3>
             <p class="text-xs text-muted-foreground">Select one of your 4 most recent saved sermons, or start without a saved sermon.</p>
           </div>
