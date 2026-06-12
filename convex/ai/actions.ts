@@ -40,6 +40,13 @@ type OpenRouterResponse = {
     message?: {
       content?: string
       citations?: string[]
+      annotations?: Array<{
+        type?: string
+        url_citation?: {
+          url?: string
+          title?: string
+        }
+      }>
     }
   }>
   cost?: number | string
@@ -69,6 +76,57 @@ function parseNumber(value: unknown): number | null {
     return Number.isFinite(n) ? n : null
   }
   return null
+}
+
+function looksLikeUrl(value: string): boolean {
+  return /^https?:\/\/[^\s)\]}>'\"]+$/i.test(value.trim())
+}
+
+function collectCitationUrls(value: unknown, urls: Set<string>) {
+  if (!value) return
+
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (looksLikeUrl(trimmed)) urls.add(trimmed)
+    return
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectCitationUrls(item, urls)
+    return
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>
+    for (const [key, nestedValue] of Object.entries(record)) {
+      const normalizedKey = key.toLowerCase()
+      if (
+        normalizedKey.includes("citation") ||
+        normalizedKey === "url" ||
+        normalizedKey === "link" ||
+        normalizedKey === "source" ||
+        normalizedKey === "sources" ||
+        normalizedKey === "annotations"
+      ) {
+        collectCitationUrls(nestedValue, urls)
+      } else if (typeof nestedValue === "object") {
+        collectCitationUrls(nestedValue, urls)
+      }
+    }
+  }
+}
+
+function extractCitations(data: OpenRouterResponse): string[] {
+  const urls = new Set<string>()
+
+  collectCitationUrls(data.citations, urls)
+  collectCitationUrls(data.choices?.[0]?.message?.citations, urls)
+  collectCitationUrls(data.choices?.[0]?.message?.annotations, urls)
+  collectCitationUrls(data, urls)
+
+  const citations = Array.from(urls)
+  console.log(`[ai] extracted ${citations.length} citation url(s) from provider response`)
+  return citations
 }
 
 function providerCostUsdMicros(data: OpenRouterResponse): number {
@@ -178,7 +236,7 @@ export const chat = action({
 
       return {
         content,
-        citations: data.citations ?? choice?.message?.citations,
+        citations: extractCitations(data),
         model: resolvedResponseModel,
         creditsCharged: creditsToCharge,
         remainingCredits: usageResult?.remainingCredits,

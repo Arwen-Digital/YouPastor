@@ -82,7 +82,7 @@ Example BRIEF_READY: "BRIEF_READY: Passage: John 11:1-44. Big idea: Jesus weeps 
 The pastor's church context is already provided in the system. Do NOT ask for it.
 NEVER produce the sermon brief yourself. Your only job is intake.`
 
-const RESEARCHER_HANDOFF_NOTE = `\n\nIMPORTANT: The conversation below already contains the pastor's passage and context (marked by RESEARCH_READY). Do not ask follow-up questions. Produce the full 7-section research output immediately based on the information shared.`
+const RESEARCHER_HANDOFF_NOTE = `\n\nIMPORTANT: The conversation below already contains the pastor's passage and context (marked by RESEARCH_READY). Do not ask follow-up questions. Produce the full 7-section research output immediately based on the information shared.\n\nCITATION REQUIREMENT: If you include numbered citations like [1], [2], or [3] in the research body, you must include a final ## References section. Every numbered citation used in the body must have a matching numbered Markdown link with the full source URL. Do not use citation numbers without a matching source URL in the References footer.`
 
 const YOUTUBE_INTAKE_PROMPT = `You are a conversational intake assistant for the Sermon to YouTube skill.
 
@@ -124,7 +124,7 @@ const auth = useAuthStore()
 const showModelDebug = computed(() => (auth.user?.email ?? '').toLowerCase() === 'arnold@lifecity.ph')
 // All skill intake starts on the orchestrator model. Coded handoffs switch to the
 // final-generation model: researcher for research/brainstorm, generator for the rest.
-const { isLoading, streamingContent, error, streamMessage, sendMessage, citations, lastModel, role, setRole } = useAI('orchestrator')
+const { isLoading, streamingContent, error, streamMessage, sendMessage, lastCitations, lastModel, role, setRole } = useAI('orchestrator')
 
 // Determine which save flow to use based on skill
 const isSeriesPlanner = props.skillSlug === 'sermon-series'
@@ -319,6 +319,7 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   model?: string
+  citations?: string[]
 }
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -529,6 +530,73 @@ function getHostname(url: string): string {
   }
 }
 
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function buildReferencesFooter(urls: string[]): string {
+  const items = urls
+    .map((url, index) => {
+      const safeUrl = escapeHtmlAttribute(url)
+      return `<li style="margin: 0.125rem 0;"><span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">[${index + 1}]</span> <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${getHostname(url)}</a></li>`
+    })
+    .join('')
+
+  return `<section style="margin-top: 1rem; font-size: 11px; line-height: 16px;"><p style="margin: 0 0 0.25rem; font-weight: 400;">References</p><ol style="margin: 0; padding-left: 0; list-style: none;">${items}</ol></section>`
+}
+
+function normalizeReferencesFooter(content: string): string {
+  const match = content.match(/(?:^|\n)#{2,3}\s+References\s*\n+([\s\S]*)$/im)
+  if (!match?.[1]) return content
+
+  const urls: string[] = []
+  for (const line of match[1].split('\n')) {
+    const markdownLink = line.match(/\[\d+\]\s+\[[^\]]+\]\((https?:\/\/[^)]+)\)/i)
+    const bareUrl = line.match(/\[\d+\]\s+(https?:\/\/\S+)/i)
+    const url = markdownLink?.[1] ?? bareUrl?.[1]
+    if (url) urls.push(url)
+  }
+
+  if (urls.length === 0) return content
+
+  const beforeReferences = content.slice(0, match.index).trim()
+  return `${beforeReferences}\n\n${buildReferencesFooter(urls)}`
+}
+
+function appendReferencesFooter(content: string, responseCitations?: string[]): string {
+  if (!isSermonResearch) return content
+
+  const normalizedContent = normalizeReferencesFooter(content)
+  if (normalizedContent !== content) return normalizedContent
+
+  const urls = responseCitations?.filter(Boolean) ?? []
+  if (urls.length === 0) return content
+
+  return `${content.trim()}\n\n${buildReferencesFooter(urls)}`
+}
+
+async function openCitation(url: string) {
+  try {
+    await window.appLinks?.openExternal?.(url)
+  } catch (err) {
+    console.warn('[citations] Failed to open external link', err)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+function handleMarkdownClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  const anchor = target?.closest('a') as HTMLAnchorElement | null
+  if (!anchor?.href) return
+
+  event.preventDefault()
+  void openCitation(anchor.href)
+}
+
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, '').trim()
 }
@@ -677,8 +745,14 @@ function looksLikeFinalSocialDeliverable(content: string): boolean {
   return content.length > 500 && (hasSocialSections || hasCalendarSections || hasChurchEmailSections || hasAnnouncementSections || hasChurchLetterSections)
 }
 
-async function handleAssistantResponse(responseContent: string, model?: string) {
-  messages.value.push({ role: 'assistant', content: responseContent, model: model || lastModel.value || undefined })
+async function handleAssistantResponse(responseContent: string, model?: string, responseCitations?: string[]) {
+  const citationsForMessage = responseCitations?.length ? responseCitations : lastCitations.value.length ? [...lastCitations.value] : undefined
+  messages.value.push({
+    role: 'assistant',
+    content: appendReferencesFooter(responseContent, citationsForMessage),
+    model: model || lastModel.value || undefined,
+    citations: citationsForMessage,
+  })
 
   // Detect intake handoff and automatically switch to researcher
   if (isSermonResearch && role.value === 'orchestrator' && responseContent.includes('RESEARCH_READY:')) {
@@ -735,7 +809,7 @@ async function startConversation(userMessage: string) {
   })
 
   if (result) {
-    await handleAssistantResponse(result.content, result.model)
+    await handleAssistantResponse(result.content, result.model, result.citations)
   }
 
   scrollToBottom()
@@ -791,7 +865,8 @@ async function handoffToResearcher() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
+    const citationsForMessage = lastCitations.value.length ? [...lastCitations.value] : undefined
+    messages.value.push({ role: 'assistant', content: appendReferencesFooter(streamingContent.value, citationsForMessage), model: lastModel.value || undefined, citations: citationsForMessage })
   }
 
   scrollToBottom()
@@ -814,7 +889,8 @@ async function handoffToBriefGenerator() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
+    const citationsForMessage = lastCitations.value.length ? [...lastCitations.value] : undefined
+    messages.value.push({ role: 'assistant', content: appendReferencesFooter(streamingContent.value, citationsForMessage), model: lastModel.value || undefined, citations: citationsForMessage })
   }
 
   scrollToBottom()
@@ -836,7 +912,8 @@ async function handoffToYoutubePackager() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
+    const citationsForMessage = lastCitations.value.length ? [...lastCitations.value] : undefined
+    messages.value.push({ role: 'assistant', content: appendReferencesFooter(streamingContent.value, citationsForMessage), model: lastModel.value || undefined, citations: citationsForMessage })
   }
 
   scrollToBottom()
@@ -858,7 +935,8 @@ async function handoffToGenerator() {
   })
 
   if (streamingContent.value) {
-    messages.value.push({ role: 'assistant', content: streamingContent.value, model: lastModel.value || undefined })
+    const citationsForMessage = lastCitations.value.length ? [...lastCitations.value] : undefined
+    messages.value.push({ role: 'assistant', content: appendReferencesFooter(streamingContent.value, citationsForMessage), model: lastModel.value || undefined, citations: citationsForMessage })
   }
 
   scrollToBottom()
@@ -879,7 +957,7 @@ async function handleSend() {
   })
 
   if (streamingContent.value) {
-    await handleAssistantResponse(streamingContent.value, lastModel.value)
+    await handleAssistantResponse(streamingContent.value, lastModel.value, lastCitations.value)
   }
 
   scrollToBottom()
@@ -1241,11 +1319,12 @@ function handleSaveModalClose() {
         >
           <div
             class="assistant-message w-full rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed prose prose-sm prose-slate max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-h2:text-base prose-h2:font-semibold prose-h3:text-sm prose-h3:font-semibold prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-strong:text-foreground prose-hr:border-border prose-hr:my-3"
+            @click="handleMarkdownClick"
             v-html="renderMarkdown(msg.content)"
           />
           <button
             @click="copyToClipboard(msg.content, i)"
-            class="absolute bottom-2 right-2 p-1.5 rounded-lg bg-background/80 border border-border text-muted-foreground hover:text-foreground hover:bg-background opacity-0 group-hover:opacity-100 transition-all duration-150 shadow-sm"
+            class="absolute top-2 right-2 p-1.5 rounded-lg bg-background/80 border border-border text-muted-foreground hover:text-foreground hover:bg-background opacity-0 group-hover:opacity-100 transition-all duration-150 shadow-sm"
             title="Copy to clipboard"
           >
             <Check v-if="copiedIndex === i" class="h-3.5 w-3.5 text-emerald-600" />
@@ -1300,29 +1379,6 @@ function handleSaveModalClose() {
       </div>
 
       <div />
-    </div>
-
-    <!-- Citations bar (Perplexity/Sonar sources) -->
-    <div v-if="isSermonResearch && citations.length > 0" class="border-t px-6 py-3 bg-muted/30 shrink-0">
-      <div class="max-w-3xl mx-auto">
-        <div class="flex items-center gap-2 mb-2">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          <span class="text-xs font-medium text-muted-foreground">Sources</span>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <a
-            v-for="(url, idx) in citations"
-            :key="idx"
-            :href="url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex items-center gap-1 rounded-md bg-background border border-border px-2 py-1 text-xs text-primary hover:bg-primary/10 transition-colors"
-          >
-            <span class="font-medium">{{ idx + 1 }}</span>
-            <span class="truncate max-w-[200px]">{{ getHostname(url) }}</span>
-          </a>
-        </div>
-      </div>
     </div>
 
     <div class="border-t px-6 py-4 bg-background shrink-0">

@@ -15,6 +15,7 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
   const error: Ref<Error | null> = ref(null)
   const streamingContent = ref('')
   const citations = ref<string[]>([])
+  const lastCitations = ref<string[]>([])
   const lastModel = ref('')
 
   const role = ref<AIRole>(initialRole)
@@ -63,6 +64,7 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
       }
 
       lastModel.value = result.model
+      lastCitations.value = result.citations ?? []
 
       if (typeof actionResult?.remainingCredits === 'number') {
         auth.setCreditBalance(actionResult.remainingCredits)
@@ -83,9 +85,7 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
         )
       }
 
-      if (result.citations && result.citations.length > 0) {
-        citations.value = result.citations
-      }
+      citations.value = result.citations ?? []
       return result
     } catch (err) {
       console.error('[useAI] sendMessage error:', err)
@@ -105,6 +105,7 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
     error.value = null
     streamingContent.value = ''
     citations.value = []
+    lastCitations.value = []
 
     try {
       const result = await sendMessage(messages, options)
@@ -131,6 +132,7 @@ export function useAI(initialRole: AIRole = 'orchestrator') {
     error,
     streamingContent,
     citations,
+    lastCitations,
     lastModel,
     role,
     setRole,

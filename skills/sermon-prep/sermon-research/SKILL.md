@@ -191,13 +191,26 @@ Use Markdown headers, tables, and lists so the output is easy to scan on screen.
 
 1. ...
 2. ...
+
+## References
+
+[1] [Source title or domain](https://example.com/source-url)
+[2] [Source title or domain](https://example.com/source-url)
 ```
+
+**References footer requirements:**
+- Always include a final `## References` section after the seven research sections.
+- If you cite sources inline using numbers like `[1]`, `[2]`, or `[3]`, those exact numbers must appear in the `## References` footer.
+- Each reference must include a clickable Markdown link with the source title or domain and the full URL.
+- Do not include bare citation numbers in the main body unless the matching source appears in the footer.
+- Do not invent source URLs. If a source URL is unavailable, do not use a numbered citation for it.
 
 **Formatting rules:**
 - Use `##` headers for each of the seven steps.
 - Use Markdown tables for the word study comparison.
 - Use bold labels (`**Label:**`) followed by the content for cross-references and themes.
 - Use numbered lists for thinking prompts.
+- Use a final `## References` section with numbered Markdown links for every inline citation number used in the report.
 - Do not use em dashes anywhere. Use commas, colons, or periods instead.
 - Keep paragraphs short (2-3 sentences max) for on-screen readability.
 
