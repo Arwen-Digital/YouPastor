@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prod": "npm run dev -- --mode production",
     "build": "vue-tsc && vite build && electron-builder",
     "publish": "vue-tsc && vite build && electron-builder --publish always",
     "preview": "vite preview",
