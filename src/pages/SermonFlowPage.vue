@@ -308,6 +308,24 @@ function renderMarkdown(content?: string): string {
   return marked.parse(content || '') as string
 }
 
+async function openExternalLink(url: string) {
+  try {
+    await window.appLinks?.openExternal?.(url)
+  } catch (err) {
+    console.warn('[sermon-flow] Failed to open external link', err)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+function handleMarkdownClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  const anchor = target?.closest('a') as HTMLAnchorElement | null
+  if (!anchor?.href) return
+
+  event.preventDefault()
+  void openExternalLink(anchor.href)
+}
+
 function formatDate(timestamp?: number): string {
   if (!timestamp) return ''
   return new Date(timestamp).toLocaleDateString(undefined, {
@@ -600,7 +618,7 @@ async function handleSave() {
                   </div>
                   <h3 class="text-lg font-semibold text-foreground">{{ selectedBrainstorm.passage }}</h3>
                   <p v-if="selectedBrainstorm.bigIdea" class="text-sm text-muted-foreground">{{ selectedBrainstorm.bigIdea }}</p>
-                  <div class="prose prose-sm prose-slate max-w-none" v-html="renderMarkdown(selectedBrainstorm.content)" />
+                  <div class="prose prose-sm prose-slate max-w-none" @click="handleMarkdownClick" v-html="renderMarkdown(selectedBrainstorm.content)" />
                 </div>
               </div>
 
@@ -674,7 +692,7 @@ async function handleSave() {
                   </div>
                   <h3 class="text-lg font-semibold text-foreground">{{ selectedResearch.scriptureRef }}</h3>
                   <p v-if="selectedResearch.topicOrAngle" class="text-sm text-muted-foreground">{{ selectedResearch.topicOrAngle }}</p>
-                  <div class="prose prose-sm prose-slate max-w-none" v-html="renderMarkdown(selectedResearch.content)" />
+                  <div class="prose prose-sm prose-slate max-w-none" @click="handleMarkdownClick" v-html="renderMarkdown(selectedResearch.content)" />
                 </div>
               </div>
 
