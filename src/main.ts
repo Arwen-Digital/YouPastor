@@ -37,6 +37,8 @@ async function bootstrap() {
         
         if (path === '/billing/success') {
           await router.push({ path: '/billing/success' })
+        } else if (path === '/billing/payrex-confirmation') {
+          await router.push({ path: '/billing/payrex-confirmation' })
         } else if (path === '/billing/cancel') {
           await router.push({ path: '/upgrade', query: { checkout: 'cancel' } })
         } else if (path === '/auth/callback') {
