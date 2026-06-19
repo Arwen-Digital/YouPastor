@@ -6,6 +6,7 @@ import { useConvexQuery } from '@/composables/useConvexQuery'
 import { useConvexAction } from '@/composables/useConvexAction'
 import { useConvexMutation } from '@/composables/useConvexMutation'
 import { useAuthStore } from '@/stores/auth'
+import posthog from 'posthog-js'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -153,6 +154,7 @@ async function handleChoosePlan(planKey: string) {
       throw new Error('Checkout URL was not returned.')
     }
 
+    posthog.capture('subscription_checkout_started', { plan: planKey })
     await openCheckoutUrl(result.checkoutUrl)
   } catch (err: any) {
     checkoutError.value = err?.message || checkoutActionError.value?.message || 'Unable to start checkout.'
@@ -175,6 +177,7 @@ async function handleBuyCreditPack(packKey: 'php_400' | 'php_800') {
       throw new Error('Checkout URL was not returned.')
     }
 
+    posthog.capture('credit_pack_checkout_started', { pack: packKey })
     await openCheckoutUrl(result.checkoutUrl)
   } catch (err: any) {
     checkoutError.value = err?.message || payrexCheckoutActionError.value?.message || 'Unable to start PayRex checkout.'
@@ -202,6 +205,7 @@ async function handleRedeemVoucher() {
   const res: any = await redeem({ code })
   if (res?.success) {
     redeemSuccess.value = `Successfully redeemed voucher. +${res.creditsAdded} credits have been added to your balance!`
+    posthog.capture('voucher_redeemed', { credits_added: res.creditsAdded })
     voucherCode.value = ''
   } else {
     redeemError.value = res?.message || redeemErrorRef.value?.message || 'Invalid voucher code or already redeemed.'

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessageSquare } from 'lucide-vue-next'
 import { useConvexAction } from '@/composables/useConvexAction'
+import posthog from 'posthog-js'
 
 type FeedbackMode = 'selector' | 'feedback' | 'bug-report' | 'feature-request'
 
@@ -107,7 +108,12 @@ async function submitCurrentForm() {
         }
 
   const result = await sendFeedback(payload as any)
-  message.value = result ? 'Thanks! Your submission has been sent.' : 'Unable to send right now.'
+  if (result) {
+    posthog.capture('feedback_submitted', { feedback_type: mode.value })
+    message.value = 'Thanks! Your submission has been sent.'
+  } else {
+    message.value = 'Unable to send right now.'
+  }
 }
 </script>
 

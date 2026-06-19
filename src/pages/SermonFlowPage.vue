@@ -23,6 +23,7 @@ import {
 import { getConvexClient } from '@/lib/convex'
 import { useConvexMutation } from '@/composables/useConvexMutation'
 import SkillChat from '@/components/SkillChat.vue'
+import posthog from 'posthog-js'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -379,6 +380,11 @@ async function handleSave() {
       currentSermonId.value = result as string
     }
     lastSavedAt.value = Date.now()
+    posthog.capture('sermon_saved', {
+      action: action.value,
+      has_series: !!resourceSeriesId.value,
+      has_scripture: !!payload.scriptureRef,
+    })
   } catch (err: any) {
     saveError.value = err?.message || 'Unable to save sermon.'
   }

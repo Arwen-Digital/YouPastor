@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getConvexClient } from '@/lib/convex'
 import { Church, User, BookOpen, Users, MapPin, BookMarked, ArrowRight, Loader2, Check } from 'lucide-vue-next'
+import posthog from 'posthog-js'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -186,6 +187,11 @@ async function handleNext() {
 
   isSaving.value = false
 
+  posthog.capture('onboarding_step_completed', {
+    step: steps[currentStep.value].key,
+    step_number: currentStep.value + 1,
+  })
+
   if (currentStep.value < steps.length - 1) {
     currentStep.value++
   } else {
@@ -204,6 +210,7 @@ async function markOnboardingDone() {
     console.error('Failed to mark onboarding complete:', err)
   }
   isComplete.value = true
+  posthog.capture('onboarding_completed')
   await auth.fetchUser()
   auth.markOnboardingComplete()
   setTimeout(() => {

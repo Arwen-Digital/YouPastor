@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { CheckCircle2, CreditCard, Home, Zap } from 'lucide-vue-next'
 import { useConvexQuery } from '@/composables/useConvexQuery'
+import posthog from 'posthog-js'
 
 const router = useRouter()
 const { result: billingResult } = useConvexQuery('billing/queries:getMyPlanAndCredits' as any)
+
+onMounted(() => {
+  posthog.capture('subscription_purchased')
+})
 
 const planLabel = computed(() => {
   const plan = billingResult.value?.planTier ?? 'free'

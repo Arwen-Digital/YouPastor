@@ -3,6 +3,9 @@ import { createPinia } from 'pinia'
 import { router } from './router'
 import App from './App.vue'
 import './assets/main.css'
+import { usePostHog } from '@/composables/usePostHog'
+
+const { posthog } = usePostHog()
 
 function getDeepLinkPath(url: string): string {
   const parsed = new URL(url)
@@ -22,6 +25,10 @@ async function bootstrap() {
   const auth = useAuthStore()
 
   await auth.fetchUser()
+
+  app.config.errorHandler = (err) => {
+    posthog.captureException(err)
+  }
 
   app.use(router)
   app.mount('#app')

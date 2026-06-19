@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { CheckCircle, ArrowLeft, Home } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import posthog from 'posthog-js'
 
 const router = useRouter()
+
+onMounted(() => {
+  posthog.capture('credit_pack_order_placed')
+})
 </script>
 
 <template>

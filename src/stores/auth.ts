@@ -6,6 +6,7 @@ import {
   setConvexAuthChangeHandler,
   setConvexAuthToken,
 } from '@/lib/convex'
+import posthog from 'posthog-js'
 
 export interface AuthUser {
   _id: string
@@ -103,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (data) {
         user.value = data as AuthUser
         isAuthenticated.value = true
+        posthog.identify(user.value._id, { email: user.value.email, name: user.value.name })
 
         void syncBrevoContact().catch((err: any) => {
           console.warn('[brevo] Failed to sync contact:', err?.message || String(err))
@@ -152,6 +154,10 @@ export const useAuthStore = defineStore('auth', () => {
 
       setConvexAuthToken(token, refreshToken)
       await fetchUser()
+      if (isAuthenticated.value && user.value) {
+        posthog.identify(user.value._id, { email: user.value.email, name: user.value.name })
+        posthog.capture('user_signed_in', { method: 'password' })
+      }
       return isAuthenticated.value
     } catch (err: any) {
       console.error('[auth] signIn error:', err)
@@ -257,6 +263,10 @@ export const useAuthStore = defineStore('auth', () => {
       setConvexAuthToken(token, refreshToken)
       localStorage.removeItem(CONVEX_AUTH_OAUTH_VERIFIER_KEY)
       await fetchUser()
+      if (isAuthenticated.value && user.value) {
+        posthog.identify(user.value._id, { email: user.value.email, name: user.value.name })
+        posthog.capture('user_signed_in_with_google')
+      }
       return isAuthenticated.value
     } catch (err: any) {
       console.error('[auth] Google callback error:', err)
@@ -328,6 +338,10 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       await fetchUser()
+      if (isAuthenticated.value && user.value) {
+        posthog.identify(user.value._id, { email: user.value.email, name: user.value.name })
+        posthog.capture('user_signed_up', { method: 'password' })
+      }
       return isAuthenticated.value
     } catch (err: any) {
       console.error('[auth] signUp error:', err)
@@ -372,6 +386,8 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (err: any) {
       console.warn('[auth] signOut error:', err?.message)
     } finally {
+      posthog.capture('user_signed_out')
+      posthog.reset()
       setConvexAuthToken(null)
       user.value = null
       isAuthenticated.value = false

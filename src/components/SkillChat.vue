@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { buildSystemPrompt, buildContextBlock, type ChurchContext } from '@/lib/skills'
 import { useConvexQuery } from '@/composables/useConvexQuery'
 import { useSaveSeries } from '@/composables/useSaveSeries'
+import posthog from 'posthog-js'
 import { useSaveResearch } from '@/composables/useSaveResearch'
 import { useSaveBrainstorm } from '@/composables/useSaveBrainstorm'
 import { useSaveAgenda } from '@/composables/useSaveAgenda'
@@ -979,6 +980,8 @@ async function handleSend() {
   messages.value.push({ role: 'user', content: text })
   scrollToBottom()
 
+  posthog.capture('skill_used', { skill_slug: props.skillSlug, skill_title: props.title })
+
   await streamMessage(buildChatHistory(), {
     operation: getCurrentChatOperation(),
     skillSlug: props.skillSlug,
@@ -1098,6 +1101,23 @@ function handleSaveConfirmChurchLetter(data: any) {
 
 function handleSaveModalClose() {
   showSaveModal.value = false
+  const wasJustSaved =
+    seriesSaveStatus.value === 'saved' ||
+    researchSaveStatus.value === 'saved' ||
+    brainstormSaveStatus.value === 'saved' ||
+    agendaSaveStatus.value === 'saved' ||
+    devotionalSaveStatus.value === 'saved' ||
+    blogSaveStatus.value === 'saved' ||
+    youtubeSaveStatus.value === 'saved' ||
+    smallGroupSaveStatus.value === 'saved' ||
+    churchSocialSaveStatus.value === 'saved' ||
+    socialCalendarSaveStatus.value === 'saved' ||
+    churchEmailSaveStatus.value === 'saved' ||
+    announcementSaveStatus.value === 'saved' ||
+    churchLetterSaveStatus.value === 'saved'
+  if (wasJustSaved) {
+    posthog.capture('skill_output_saved', { skill_slug: props.skillSlug })
+  }
   if (isSeriesPlanner && seriesSaveStatus.value === 'saved' && savedSeriesId.value) {
     const seriesId = savedSeriesId.value
     resetSeriesSave()

@@ -330,7 +330,7 @@ app.whenReady().then(() => {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convexsite.cloud https://openrouter.ai https://*.openrouter.ai ws://localhost:* wss://localhost:* http://localhost:* ws://127.0.0.1:* wss://127.0.0.1:* http://127.0.0.1:*; font-src 'self' data:",
+          "default-src 'self'; script-src 'self' http://localhost:* https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convexsite.cloud https://openrouter.ai https://*.openrouter.ai https://us.i.posthog.com https://us-assets.i.posthog.com ws://localhost:* wss://localhost:* http://localhost:* ws://127.0.0.1:* wss://127.0.0.1:* http://127.0.0.1:*; font-src 'self' data:",
         ],
       },
     })
