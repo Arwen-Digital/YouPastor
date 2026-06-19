@@ -177,6 +177,11 @@ const routes = [
         component: () => import('@/pages/BillingSuccessPage.vue'),
       },
       {
+        path: 'billing/payrex-confirmation',
+        name: 'billing-payrex-confirmation',
+        component: () => import('@/pages/PayrexConfirmationPage.vue'),
+      },
+      {
         path: 'admin',
         name: 'admin',
         component: () => import('@/pages/AdminPage.vue'),

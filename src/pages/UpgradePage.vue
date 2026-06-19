@@ -11,7 +11,9 @@ const route = useRoute()
 const auth = useAuthStore()
 
 const { result: billingResult } = useConvexQuery('billing/queries:getMyPlanAndCredits' as any)
+const { result: profileResult, isLoading: profileLoading } = useConvexQuery('profile/queries:getMine' as any)
 const { run: createCheckout, isLoading: checkoutLoading, error: checkoutActionError } = useConvexAction('billing/actions:createCheckout' as any)
+const { run: createPayrexCheckout, isLoading: payrexCheckoutLoading, error: payrexCheckoutActionError } = useConvexAction('billing/payrexActions:createCheckout' as any)
 
 const creditBalance = computed(() => billingResult.value?.creditBalance ?? auth.user?.creditBalance ?? 0)
 const lastKnownPlan = ref<'free' | 'starter' | 'pro'>('free')
@@ -27,6 +29,7 @@ watch(
 const currentPlan = computed<'free' | 'starter' | 'pro'>(() => lastKnownPlan.value)
 const normalizedCurrentPlan = computed<'free' | 'starter' | 'pro'>(() => currentPlan.value)
 const loadingPlan = ref<'starter' | 'pro' | null>(null)
+const loadingCreditPack = ref<'php_400' | 'php_800' | null>(null)
 const checkoutError = ref<string | null>(null)
 
 const checkoutStatus = computed(() => {
@@ -67,6 +70,34 @@ const plans = [
   },
 ] as const
 
+const payrexCreditPacks = [
+  {
+    key: 'php_400',
+    name: '400 Credits',
+    price: '₱400',
+    credits: '400 credits',
+    description: 'A simple one-time credit top-up for sermon prep and writing workflows.',
+    featured: false,
+  },
+  {
+    key: 'php_800',
+    name: '1000 Credits',
+    price: '₱800',
+    credits: '1000 credits',
+    description: 'Best value for regular weekly use across YouPastor skills.',
+    featured: true,
+  },
+] as const
+
+function extractCountry(location?: string): string {
+  if (!location) return ''
+  const parts = location.split(',')
+  return (parts[parts.length - 1] ?? '').trim()
+}
+
+const profileCountry = computed(() => extractCountry(profileResult.value?.location))
+const isPhilippinesUser = computed(() => profileCountry.value.toLowerCase() === 'philippines')
+
 function isElectronRuntime(): boolean {
   return typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent)
 }
@@ -104,7 +135,7 @@ function getPlanCta(planKey: string): string {
 }
 
 function isPlanActionDisabled(planKey: string): boolean {
-  if (checkoutLoading.value || loadingPlan.value === planKey) return true
+  if (checkoutLoading.value || payrexCheckoutLoading.value || loadingPlan.value === planKey) return true
   if (planKey === normalizedCurrentPlan.value) return true
   if (planKey === 'free') return true
   return false
@@ -127,6 +158,28 @@ async function handleChoosePlan(planKey: string) {
     checkoutError.value = err?.message || checkoutActionError.value?.message || 'Unable to start checkout.'
   } finally {
     loadingPlan.value = null
+  }
+}
+
+function isCreditPackActionDisabled(packKey: string): boolean {
+  return payrexCheckoutLoading.value || checkoutLoading.value || loadingCreditPack.value === packKey
+}
+
+async function handleBuyCreditPack(packKey: 'php_400' | 'php_800') {
+  checkoutError.value = null
+  loadingCreditPack.value = packKey
+
+  try {
+    const result: any = await createPayrexCheckout({ pack: packKey })
+    if (!result?.checkoutUrl) {
+      throw new Error('Checkout URL was not returned.')
+    }
+
+    await openCheckoutUrl(result.checkoutUrl)
+  } catch (err: any) {
+    checkoutError.value = err?.message || payrexCheckoutActionError.value?.message || 'Unable to start PayRex checkout.'
+  } finally {
+    loadingCreditPack.value = null
   }
 }
 
@@ -163,7 +216,9 @@ async function handleRedeemVoucher() {
         <Zap class="h-6 w-6 text-primary" />
         <h2 class="text-2xl font-semibold tracking-tight">Subscription</h2>
       </div>
-      <p class="mt-2 text-sm text-muted-foreground">Pick a plan that fits your weekly sermon workflow. Credits refill every billing cycle.</p>
+      <p class="mt-2 text-sm text-muted-foreground">
+        {{ isPhilippinesUser ? 'Buy credits as a one-time purchase for your sermon workflow.' : 'Pick a plan that fits your weekly sermon workflow. Credits refill every billing cycle.' }}
+      </p>
       <div class="mt-4 inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
         <span class="text-xs text-muted-foreground">Current credits</span>
         <span class="text-sm font-semibold text-foreground">{{ creditBalance }}</span>
@@ -181,7 +236,57 @@ async function handleRedeemVoucher() {
       </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div v-if="profileLoading" class="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+      Loading payment options...
+    </div>
+
+    <div v-else-if="isPhilippinesUser" class="grid gap-4 md:grid-cols-2">
+      <div
+        v-for="pack in payrexCreditPacks"
+        :key="pack.key"
+        :class="[
+          'rounded-xl border bg-card p-5 space-y-4',
+          pack.featured ? 'border-primary shadow-sm ring-1 ring-primary/20' : 'border-border',
+        ]"
+      >
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-foreground">{{ pack.name }}</p>
+            <span v-if="pack.featured" class="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Best Value</span>
+          </div>
+          <p class="text-2xl font-semibold text-foreground">{{ pack.price }}</p>
+          <p class="text-sm text-muted-foreground">{{ pack.credits }}</p>
+        </div>
+
+        <p class="text-sm text-muted-foreground">{{ pack.description }}</p>
+
+        <ul class="space-y-2 text-sm text-foreground">
+          <li class="flex items-center gap-2">
+            <Check class="h-4 w-4 text-emerald-600" />
+            One-time credit purchase
+          </li>
+          <li class="flex items-center gap-2">
+            <Check class="h-4 w-4 text-emerald-600" />
+            Credits are added after manual payment confirmation
+          </li>
+        </ul>
+
+        <button
+          @click="handleBuyCreditPack(pack.key)"
+          :disabled="isCreditPackActionDisabled(pack.key)"
+          :class="[
+            'w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+            pack.featured
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : 'border border-border text-foreground hover:bg-muted',
+          ]"
+        >
+          {{ loadingCreditPack === pack.key ? 'Opening checkout...' : 'Buy credits' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-else class="grid gap-4 md:grid-cols-3">
       <div
         v-for="plan in plans"
         :key="plan.key"
@@ -266,7 +371,7 @@ async function handleRedeemVoucher() {
     </div>
 
     <p class="text-xs text-muted-foreground text-center">
-      Secure checkout powered by LemonSqueezy.
+      Secure checkout powered by {{ isPhilippinesUser ? 'PayRex' : 'LemonSqueezy' }}.
     </p>
   </div>
 </template>
