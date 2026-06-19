@@ -60,7 +60,11 @@ jobs:
             --output-format json >/dev/null
           npx vue-tsc
           npx vite build
-          npx --yes @posthog/cli@latest --host https://us.posthog.com sourcemap process --directory dist --release-name youpastor --release-version "$GITHUB_SHA" --skip-on-conflict
+          if [ -n "$POSTHOG_CLI_API_KEY" ]; then
+            npx --yes @posthog/cli@latest --host https://us.posthog.com sourcemap process --directory dist --release-name youpastor --release-version "$GITHUB_SHA" --skip-on-conflict
+          else
+            echo "::warning::POSTHOG_AUTH_TOKEN secret is not configured; skipping PostHog sourcemap upload."
+          fi
           npx electron-builder --mac dmg zip --universal --publish never
 
       - name: Build Windows installers
