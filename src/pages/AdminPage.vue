@@ -83,6 +83,15 @@ async function selectUser(userId: string) {
   }
 }
 
+function closeUserDetail() {
+  if (gifting.value) return
+  selectedUserId.value = null
+  selectedUser.value = null
+  transactions.value = []
+  giftMessage.value = null
+  showGiftConfirm.value = false
+}
+
 function openGiftConfirm() {
   giftMessage.value = null
   showGiftConfirm.value = true
@@ -260,7 +269,7 @@ onMounted(() => {
             v-for="u in users"
             :key="u._id"
             @click="selectUser(u._id)"
-            class="w-full rounded-lg border border-border px-3 py-2 text-left hover:bg-muted"
+            :class="['w-full rounded-lg border px-3 py-2 text-left hover:bg-muted', selectedUserId === u._id ? 'border-primary bg-primary/5' : 'border-border']"
           >
             <div class="text-sm font-medium text-foreground">{{ u.name || 'Unnamed user' }}</div>
             <div class="text-xs text-muted-foreground">{{ u.email }} • {{ u.creditBalance }} credits</div>
@@ -268,17 +277,59 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-if="hasSelectedUser" class="grid gap-4 lg:grid-cols-[1fr,1fr]">
+      <div v-if="hasSelectedUser" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" @click.self="closeUserDetail">
+        <div class="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-background shadow-xl">
+          <div class="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-5 py-4 backdrop-blur">
+            <div>
+              <h3 class="text-base font-semibold text-foreground">User account</h3>
+              <p class="text-xs text-muted-foreground">{{ selectedUser?.email || 'Loading user details...' }}</p>
+            </div>
+            <button
+              @click="closeUserDetail"
+              :disabled="gifting"
+              class="rounded-lg px-2 py-1 text-xl leading-none text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+              aria-label="Close user details"
+            >
+              ×
+            </button>
+          </div>
+
+          <div class="space-y-4 p-5">
+            <div class="grid gap-4 lg:grid-cols-[1fr,1fr]">
         <div class="rounded-xl border bg-card p-4 space-y-3">
           <h3 class="text-sm font-semibold text-foreground">User Details</h3>
           <div v-if="loadingDetail" class="text-sm text-muted-foreground">Loading...</div>
-          <div v-else-if="selectedUser" class="space-y-1 text-sm">
-            <p><span class="text-muted-foreground">Name:</span> {{ selectedUser.name || '—' }}</p>
-            <p><span class="text-muted-foreground">Email:</span> {{ selectedUser.email || '—' }}</p>
-            <p><span class="text-muted-foreground">Church:</span> {{ selectedUser.churchName || '—' }}</p>
-            <p><span class="text-muted-foreground">Denomination:</span> {{ selectedUser.denomination || '—' }}</p>
-            <p><span class="text-muted-foreground">Current credits:</span> <strong>{{ selectedUser.creditBalance }}</strong></p>
-            <p><span class="text-muted-foreground">Created:</span> {{ formatDate(selectedUser.createdAt) }}</p>
+          <div v-else-if="selectedUser" class="space-y-4 text-sm">
+            <div class="grid gap-2 sm:grid-cols-2">
+              <p><span class="text-muted-foreground">Name:</span> {{ selectedUser.name || '—' }}</p>
+              <p><span class="text-muted-foreground">Email:</span> {{ selectedUser.email || '—' }}</p>
+              <p><span class="text-muted-foreground">Auth name:</span> {{ selectedUser.authName || '—' }}</p>
+              <p><span class="text-muted-foreground">User ID:</span> <span class="font-mono text-xs">{{ selectedUser._id }}</span></p>
+              <p><span class="text-muted-foreground">Created:</span> {{ formatDate(selectedUser.createdAt) }}</p>
+              <p><span class="text-muted-foreground">Onboarding:</span> {{ selectedUser.onboardingComplete ? 'Complete' : 'Incomplete' }}</p>
+            </div>
+
+            <div class="border-t pt-3">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Church profile</p>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <p><span class="text-muted-foreground">Profile:</span> {{ selectedUser.hasProfile ? 'Exists' : 'Missing' }}</p>
+                <p><span class="text-muted-foreground">Church:</span> {{ selectedUser.churchName || '—' }}</p>
+                <p><span class="text-muted-foreground">Denomination:</span> {{ selectedUser.denomination || '—' }}</p>
+                <p><span class="text-muted-foreground">Location:</span> {{ selectedUser.location || '—' }}</p>
+                <p><span class="text-muted-foreground">Attendance:</span> {{ selectedUser.averageAttendance || '—' }}</p>
+                <p><span class="text-muted-foreground">Bible translation:</span> {{ selectedUser.bibleTranslation || '—' }}</p>
+              </div>
+            </div>
+
+            <div class="border-t pt-3">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Billing</p>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <p><span class="text-muted-foreground">Current credits:</span> <strong>{{ selectedUser.creditBalance }}</strong></p>
+                <p><span class="text-muted-foreground">Plan:</span> {{ selectedUser.planTier || 'free' }}</p>
+                <p><span class="text-muted-foreground">Subscription:</span> {{ selectedUser.subscriptionStatus || 'none' }}</p>
+                <p><span class="text-muted-foreground">Period end:</span> {{ formatDate(selectedUser.currentPeriodEnd) || '—' }}</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -299,7 +350,9 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-if="hasSelectedUser" class="rounded-xl border bg-card p-4 space-y-3">
+            </div>
+
+            <div class="rounded-xl border bg-card p-4 space-y-3">
         <h3 class="text-sm font-semibold text-foreground">Transaction History</h3>
         <div v-if="!transactions.length" class="text-sm text-muted-foreground">No transactions yet.</div>
         <div v-else class="space-y-2">
@@ -329,6 +382,8 @@ onMounted(() => {
                 Next
               </button>
             </div>
+          </div>
+        </div>
           </div>
         </div>
       </div>

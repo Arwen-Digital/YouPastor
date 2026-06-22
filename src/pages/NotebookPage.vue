@@ -1279,7 +1279,7 @@ const filteredList = computed(() => {
 
     <!-- List View -->
     <div v-if="view === 'list'" class="flex-1 overflow-y-auto">
-      <div class="max-w-4xl mx-auto px-6 py-6">
+      <div class="max-w-6xl mx-auto px-6 py-6">
         <!-- Tabs -->
         <div class="flex flex-col gap-3 mb-6">
           <div class="flex items-center gap-1 rounded-lg bg-muted p-1 w-fit">
@@ -1449,8 +1449,8 @@ const filteredList = computed(() => {
         </div>
 
         <!-- Items -->
-        <div v-else class="space-y-3">
-          <div v-if="listLoading && filteredList.length === 0" class="flex items-center justify-center py-12">
+        <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div v-if="listLoading && filteredList.length === 0" class="col-span-full flex items-center justify-center py-12">
             <Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
 
@@ -1473,9 +1473,9 @@ const filteredList = computed(() => {
               : item.type === 'announcementScript' ? `/notebook/announcement/${item.id}`
               : `/notebook/church-letter/${item.id}`
             )"
-            class="w-full group flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/30 hover:shadow-sm"
+            class="group flex min-h-[190px] w-full flex-col justify-between rounded-2xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
           >
-            <div class="mt-0.5 shrink-0">
+            <div class="shrink-0">
               <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', getTypeBadge(item.type).color]">
                 <BookOpen v-if="item.type === 'sermon' || item.type === 'series'" class="h-5 w-5" />
                 <Search v-else-if="item.type === 'research'" class="h-5 w-5" />
@@ -1492,20 +1492,20 @@ const filteredList = computed(() => {
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
             </div>
-            <div class="flex-1 min-w-0">
+            <div class="flex w-full min-w-0 flex-1 flex-col justify-end pt-6">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <h3 class="text-sm font-semibold text-foreground truncate">{{ item.title }}</h3>
-                  <p v-if="item.subtitle" class="text-xs text-muted-foreground mt-0.5 truncate">{{ item.subtitle }}</p>
+                  <h3 class="truncate text-lg font-semibold leading-snug text-foreground">{{ item.title }}</h3>
+                  <p v-if="item.subtitle" class="mt-1 truncate text-sm text-muted-foreground">{{ item.subtitle }}</p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                   <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', getTypeBadge(item.type).color]">
                     {{ getTypeBadge(item.type).label }}
                   </span>
-                  <ChevronRight class="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <ChevronRight class="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
                 </div>
               </div>
-              <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
                 <span v-if="item.date" class="shrink-0">{{ formatDate(item.date) }}</span>
                 <span
                   v-if="getStatusLabel(item.status)"

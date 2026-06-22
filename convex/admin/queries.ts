@@ -84,13 +84,30 @@ export const getUserDetail = query({
       .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
       .first()
 
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+      .order("desc")
+      .first()
+
     return {
       _id: authUser._id,
       email: authUser.email ?? "",
+      authName: authUser.name ?? "",
       name: profile?.pastorName ?? authUser.name ?? "",
+      pastorFirstName: profile?.pastorFirstName ?? "",
+      pastorLastName: profile?.pastorLastName ?? "",
       churchName: profile?.churchName ?? "",
       denomination: profile?.denomination ?? "",
+      averageAttendance: profile?.averageAttendance ?? "",
+      location: profile?.location ?? "",
+      bibleTranslation: profile?.bibleTranslation ?? "",
+      onboardingComplete: profile?.onboardingComplete ?? false,
+      hasProfile: !!profile,
       creditBalance: profile?.creditBalance ?? 0,
+      planTier: subscription?.planTier ?? "free",
+      subscriptionStatus: subscription?.subscriptionStatus ?? "none",
+      currentPeriodEnd: subscription?.currentPeriodEnd,
       createdAt: authUser._creationTime,
     }
   },
