@@ -196,6 +196,14 @@ onUnmounted(() => {
       <div v-if="showSidebarDragRegion" class="sidebar-drag-region" />
       <div class="px-3 pt-3 pb-2">
         <button
+          @click="navigateTo('/')"
+          class="mb-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/50"
+        >
+          <img src="/icon.png" alt="YouPastor" class="h-8 w-8 rounded-lg object-cover" />
+          <span class="text-base font-semibold tracking-tight text-foreground">YouPastor</span>
+        </button>
+
+        <button
           v-for="item in topNav"
           :key="item.label"
           @click="navigateTo(item.path!)"
