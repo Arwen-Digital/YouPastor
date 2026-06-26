@@ -1399,9 +1399,10 @@ function handleSaveModalClose() {
       </div>
 
       <div v-if="isLoading && !streamingContent" class="flex justify-start">
-        <div class="flex items-center gap-2 rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm text-muted-foreground">
-          <Loader2 class="h-4 w-4 animate-spin" />
-          Thinking...
+        <div class="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm text-muted-foreground" aria-label="Thinking">
+          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:120ms]" />
+          <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:240ms]" />
         </div>
       </div>
 
