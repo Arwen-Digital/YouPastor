@@ -532,61 +532,8 @@ function renderMarkdown(content: string): string {
   return marked.parse(content) as string
 }
 
-function getHostname(url: string): string {
-  try {
-    return new URL(url).hostname.replace('www.', '')
-  } catch {
-    return url
-  }
-}
-
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
-
-function buildReferencesFooter(urls: string[]): string {
-  const items = urls
-    .map((url, index) => {
-      const safeUrl = escapeHtmlAttribute(url)
-      return `<li style="margin: 0.125rem 0;"><span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">[${index + 1}]</span> <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${getHostname(url)}</a></li>`
-    })
-    .join('')
-
-  return `<section style="margin-top: 1rem; font-size: 11px; line-height: 16px;"><p style="margin: 0 0 0.25rem; font-weight: 400;">References</p><ol style="margin: 0; padding-left: 0; list-style: none;">${items}</ol></section>`
-}
-
-function normalizeReferencesFooter(content: string): string {
-  const match = content.match(/(?:^|\n)#{2,3}\s+References\s*\n+([\s\S]*)$/im)
-  if (!match?.[1]) return content
-
-  const urls: string[] = []
-  for (const line of match[1].split('\n')) {
-    const markdownLink = line.match(/\[\d+\]\s+\[[^\]]+\]\((https?:\/\/[^)]+)\)/i)
-    const bareUrl = line.match(/\[\d+\]\s+(https?:\/\/\S+)/i)
-    const url = markdownLink?.[1] ?? bareUrl?.[1]
-    if (url) urls.push(url)
-  }
-
-  if (urls.length === 0) return content
-
-  const beforeReferences = content.slice(0, match.index).trim()
-  return `${beforeReferences}\n\n${buildReferencesFooter(urls)}`
-}
-
-function appendReferencesFooter(content: string, responseCitations?: string[]): string {
-  if (!isSermonResearch && !isSermonBrainstorm) return content
-
-  const normalizedContent = normalizeReferencesFooter(content)
-  if (normalizedContent !== content) return normalizedContent
-
-  const urls = responseCitations?.filter(Boolean) ?? []
-  if (urls.length === 0) return content
-
-  return `${content.trim()}\n\n${buildReferencesFooter(urls)}`
+function appendReferencesFooter(content: string, _responseCitations?: string[]): string {
+  return content
 }
 
 async function openCitation(url: string) {
