@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import {
   CONVEX_AUTH_TOKEN_KEY,
   getConvexClient,
+  getPublicConvexHttpClient,
   setConvexAuthChangeHandler,
   setConvexAuthToken,
 } from '@/lib/convex'
@@ -52,7 +53,9 @@ export const useAuthStore = defineStore('auth', () => {
 
     void import('@/router')
       .then(({ router }) => {
-        if (router.currentRoute.value.name !== 'login') {
+        const currentRoute = router.currentRoute.value
+        const isPublicRoute = currentRoute.matched.some((record) => record.meta.public === true)
+        if (!isPublicRoute) {
           void router.push('/login')
         }
       })
@@ -353,6 +356,70 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function requestPasswordReset(email: string): Promise<boolean> {
+    if (DEV_BYPASS) return true
+
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const client = getPublicConvexHttpClient()
+      const result = await withTimeout(
+        client.action('passwordReset/actions:sendCode' as any, { email }),
+        'Password reset request'
+      )
+      if (result?.ok !== true) {
+        throw new Error('Password reset request did not complete')
+      }
+      error.value = null
+      return true
+    } catch (err: any) {
+      console.error('[auth] password reset request error:', err)
+      error.value = parseAuthError(err)
+      return false
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function resetPasswordWithCode(email: string, code: string, newPassword: string): Promise<boolean> {
+    if (DEV_BYPASS) {
+      setDevUser(email)
+      return true
+    }
+
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const client = getPublicConvexHttpClient()
+      const result = await withTimeout(
+        client.action('auth:signIn' as any, {
+          provider: 'password',
+          params: { email, code, newPassword, flow: 'reset-verification' },
+        }),
+        'Password reset verification'
+      )
+
+      const token = result?.tokens?.token ?? null
+      const refreshToken = result?.tokens?.refreshToken ?? null
+      if (!token || !refreshToken) {
+        throw new Error('No auth tokens returned from server')
+      }
+
+      setConvexAuthToken(token, refreshToken)
+      await fetchUser()
+      return isAuthenticated.value
+    } catch (err: any) {
+      console.error('[auth] password reset verification error:', err)
+      error.value = parseAuthError(err)
+      isAuthenticated.value = false
+      return false
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function syncBrevoContact(options: { name?: string; force?: boolean } = {}): Promise<void> {
     const client = getConvexClient()
     const args: { name?: string; force?: boolean } = {}
@@ -421,6 +488,8 @@ export const useAuthStore = defineStore('auth', () => {
     signInWithGoogle,
     completeGoogleSignIn,
     signUpWithPassword,
+    requestPasswordReset,
+    resetPasswordWithCode,
     signOut,
     fetchUser,
     clearError,
@@ -488,6 +557,12 @@ function parseAuthError(err: any): string {
     .replace(/\s+/g, ' ')
     .trim()
 
+  if (normalized.includes('Failed to send password reset email')) {
+    return 'Could not send the reset email. Please try again in a moment.'
+  }
+  if (normalized.includes('Password reset is not enabled')) {
+    return 'Password reset is not enabled. Please contact support.'
+  }
   if (normalized.includes('Invalid password') || normalized.includes('Invalid credentials') || normalized.includes('InvalidSecret')) {
     return 'Incorrect password. Please try again.'
   }
@@ -499,6 +574,9 @@ function parseAuthError(err: any): string {
   }
   if (normalized.includes('too short') || normalized.includes('at least')) {
     return 'Password must be at least 8 characters.'
+  }
+  if (normalized.includes('Invalid code')) {
+    return 'That reset code is invalid or expired. Please check the code and try again.'
   }
   if (normalized.includes('Invalid email')) {
     return 'Please enter a valid email address.'

@@ -26,6 +26,13 @@ export function getConvexClient(): ConvexClient {
   return client
 }
 
+export function getPublicConvexHttpClient(): ConvexHttpClient {
+  if (!convexUrl) {
+    throw new Error('VITE_CONVEX_URL is not set. Run `npx convex dev` to configure.')
+  }
+  return new ConvexHttpClient(convexUrl)
+}
+
 export function setConvexAuthChangeHandler(handler: ((isAuthenticated: boolean) => void) | null) {
   authChangeHandler = handler
 }

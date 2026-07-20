@@ -299,6 +299,11 @@ function switchMode(newMode: 'signin' | 'signup') {
               </button>
             </div>
             <p v-if="passwordError" class="text-xs text-destructive">{{ passwordError }}</p>
+            <div v-if="mode === 'signin'" class="text-right">
+              <RouterLink to="/reset-password" class="text-xs font-medium text-primary hover:underline underline-offset-2">
+                Reset your password
+              </RouterLink>
+            </div>
           </div>
 
           <!-- Confirm Password (signup only) -->

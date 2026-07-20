@@ -15,6 +15,12 @@ const routes = [
     meta: { public: true },
   },
   {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('@/pages/ResetPasswordPage.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/onboarding',
     name: 'onboarding',
     component: () => import('@/pages/OnboardingPage.vue'),
