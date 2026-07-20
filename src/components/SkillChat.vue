@@ -532,8 +532,18 @@ function renderMarkdown(content: string): string {
   return marked.parse(content) as string
 }
 
-function appendReferencesFooter(content: string, _responseCitations?: string[]): string {
-  return content
+function appendReferencesFooter(content: string, responseCitations?: string[]): string {
+  const citations = [...new Set((responseCitations ?? []).map(url => url.trim()).filter(Boolean))]
+  if (!citations.length) return content
+
+  const hasReferencesSection = /(^|\n)#{2,3}\s+(references|sources)\b/i.test(content)
+  if (hasReferencesSection) return content
+
+  const references = citations
+    .map((url, index) => `${index + 1}. [${url}](${url})`)
+    .join('\n')
+
+  return `${content.trim()}\n\n## References\n\n${references}`
 }
 
 async function openCitation(url: string) {
