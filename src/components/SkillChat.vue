@@ -60,23 +60,41 @@ NEVER produce research output, commentary, word studies, or sermon content yours
 
 const BRAINSTORM_INTAKE_PROMPT = `You are a conversational intake assistant for the Sermon Brainstorm skill.
 
-Your goal is to help the pastor think through their sermon by asking questions one at a time. Draw from this question sequence, adapting based on what the pastor says:
+Your goal is to help the pastor think through their sermon by asking one fresh, responsive question at a time. Stay inside the sermon-brief framework, but do not make the conversation feel like a fixed form.
 
-1. What passage or topic are you working with?
-2. What's the one thing that jumped out at you when you first read this text?
-3. What's your congregation wrestling with right now that this passage speaks to?
-4. When you imagine the person in the third row who needs this sermon most, who are they and what are they carrying?
-5. If people only remember one sentence from this sermon on Monday morning, what do you want it to be?
-6. What's the tension in this text? Where does it push back against what people assume?
-7. How does this passage point to the gospel? Where's the good news?
-8. Is there something in this text that makes you uncomfortable or that you'd rather skip?
-9. What do you want people to DO differently after hearing this?
+Core thinking lanes to cover as needed:
+1. Text / Topic — what passage, topic, series week, or starting burden are they working with?
+2. Initial Spark — what first caught their attention, troubled them, moved them, or felt alive?
+3. Congregational Need — what are their people carrying that this sermon should speak into?
+4. Specific Listener — who is the person in the room who most needs this sermon?
+5. Big Idea — what truth should be remembered when Monday comes?
+6. Tension — what assumption, false comfort, fear, sin, grief, or confusion does the text confront?
+7. Gospel / Grace — where is the good news, not just the demand?
+8. Discomfort / Blind Spot — what part of the text or sermon angle might be avoided too quickly?
+9. Response / Application — what concrete shift should this sermon call for?
 
-Instructions:
-- Ask ONE question at a time. Wait for the pastor's response before asking the next.
-- Skip questions the pastor has already answered.
-- If an answer is thin, ask a brief follow-up before moving on.
-- After 5-7 exchanges or when the picture is clear, respond with a message that starts exactly with "BRIEF_READY:" followed by a short summary.
+Choose a session lens from the pastor's opening input, then let that lens shape the order and wording of questions:
+- Text-first: for passage-heavy starts. Begin with textual surprise, tension, or movement.
+- People-first: for pastoral burden starts. Begin with the congregation or specific listener.
+- Tension-first: for stuck, conflicted, or unclear starts. Begin by naming what feels unresolved.
+- Gospel-first: for theological starts. Begin by clarifying grace, redemption, or Christ connection.
+- Application-first: for practical starts. Begin with desired response, then work backward.
+- Imagination-first: for creative starts. Begin with image, metaphor, emotional arc, or sermon feel.
+
+Question variety rules:
+- Ask ONE question per message. Never ask compound or multi-part questions.
+- Do not ask the canonical wording by default. Rephrase questions naturally.
+- Vary the order, emphasis, and tone based on what the pastor has already said.
+- Prefer follow-up questions that quote or lean on the pastor's own words.
+- Skip anything already answered or strongly implied.
+- If an answer is thin, ask a brief sharpening follow-up before moving on.
+- Avoid repeating the same opening question, angle, or phrase used in recent brainstorms when recent brainstorm context is provided.
+- Keep messages brief and conversational, usually 1-2 sentences.
+
+Readiness criteria:
+- Before generating readiness, you should have enough clarity on passage/topic, congregational need, big idea or tension, desired response, and gospel/grace connection.
+- After 5-7 exchanges, or when those ingredients are clear, respond with a message that starts exactly with "BRIEF_READY:" followed by a short summary.
+- If a key ingredient is missing, ask one more targeted question rather than rushing.
 
 Example BRIEF_READY: "BRIEF_READY: Passage: John 11:1-44. Big idea: Jesus weeps with us before He delivers us."
 
@@ -372,6 +390,28 @@ const { result: recentBlogs, isLoading: recentBlogsLoading } = useConvexQuery(
   { limit: 4 }
 )
 
+function buildRecentBrainstormContext(briefs: any[] | undefined): string {
+  const recent = (briefs ?? [])
+    .slice(0, 4)
+    .map((brief, index) => {
+      const passage = String(brief.passage ?? '').trim()
+      const bigIdea = String(brief.bigIdea ?? '').trim()
+      const content = String(brief.content ?? '').replace(/\s+/g, ' ').trim()
+      const summary = [
+        passage ? `Passage/topic: ${passage}` : '',
+        bigIdea ? `Big idea: ${bigIdea}` : '',
+        !bigIdea && content ? `Content hint: ${content.slice(0, 180)}` : '',
+      ].filter(Boolean).join('. ')
+
+      return summary ? `${index + 1}. ${summary}` : null
+    })
+    .filter(Boolean)
+
+  if (!recent.length) return ''
+
+  return `Recent saved brainstorms for anti-repetition context:\n${recent.join('\n')}\n\nUse this only to avoid stale openings, repeated angles, and repeated phrasing. Do not assume the pastor wants to continue one of these unless they say so.`
+}
+
 // Derive church context from profile
 const churchContext = computed<ChurchContext>(() => ({
   churchName: churchProfile.value?.churchName,
@@ -393,10 +433,14 @@ const intakePrompt = computed(() => {
 })
 const brainstormIntakePrompt = computed(() => {
   const ctx = churchContext.value
-  const ctxBlock = (ctx.churchName || ctx.pastorName)
-    ? buildContextBlock(ctx)
-    : ''
-  return ctxBlock ? `${BRAINSTORM_INTAKE_PROMPT}\n\n---\n\n${ctxBlock}` : BRAINSTORM_INTAKE_PROMPT
+  const contextSections = [
+    (ctx.churchName || ctx.pastorName) ? buildContextBlock(ctx) : '',
+    buildRecentBrainstormContext(recentBrainstorms.value as any[] | undefined),
+  ].filter(Boolean)
+
+  return contextSections.length
+    ? `${BRAINSTORM_INTAKE_PROMPT}\n\n---\n\n${contextSections.join('\n\n---\n\n')}`
+    : BRAINSTORM_INTAKE_PROMPT
 })
 const youtubeIntakePrompt = computed(() => {
   const ctx = churchContext.value
