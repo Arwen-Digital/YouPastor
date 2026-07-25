@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronRight,
   LogOut,
+  Plus,
   Shield,
 } from 'lucide-vue-next'
 
@@ -87,6 +88,7 @@ interface NavItem {
   path?: string
   children?: NavItem[]
   section?: string
+  emphasized?: boolean
 }
 
 const topNav: NavItem[] = [
@@ -103,7 +105,7 @@ const workspaceSections: NavItem[] = [
       { label: 'Series Planner', icon: Layers, path: '/series' },
       { label: 'Brainstorm', icon: Lightbulb, path: '/brainstorm' },
       { label: 'Research', icon: ResearchIcon, path: '/research' },
-      { label: 'Create a Sermon', icon: BookOpen, path: '/sermons' },
+      { label: 'Create a Sermon', icon: Plus, path: '/sermons', emphasized: true },
     ],
   },
   {
@@ -250,10 +252,14 @@ onUnmounted(() => {
               :key="child.label"
               @click="navigateTo(child.path!)"
               :class="[
-                'w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors',
-                isActive(child.path!)
-                  ? 'bg-accent text-accent-foreground font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/30',
+                'w-full flex items-center gap-3 px-3 py-1.5 rounded-md border text-sm transition-colors',
+                child.emphasized
+                  ? isActive(child.path!)
+                    ? 'border-transparent bg-primary/10 text-primary font-medium'
+                    : 'border-transparent text-foreground font-medium hover:bg-accent/30 hover:text-primary'
+                  : isActive(child.path!)
+                    ? 'border-transparent bg-accent text-accent-foreground font-medium'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30',
               ]"
             >
               <component :is="child.icon" class="h-3.5 w-3.5" />
