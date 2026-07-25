@@ -70,7 +70,7 @@ The AI will always cite book, chapter, and verse. No vague "the Bible says" refe
 
 ### Rule 4: Never generate a finished sermon.
 
-Sermon prep skills can help you research a passage, brainstorm illustrations, build an outline, and pressure-test your structure. But the sermon itself is yours. The AI will not produce a manuscript you can preach word-for-word. That work belongs to you and the Holy Spirit.
+Sermon prep skills can help you research a passage, brainstorm illustrations, develop and pressure-test your own structure, and sharpen your writing. But the sermon itself is yours. The AI will not produce a manuscript you can preach word-for-word or invent the complete sermon structure for you. That work belongs to you and the Holy Spirit.
 
 ### Rule 5: Use scripture accurately.
 

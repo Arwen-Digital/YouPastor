@@ -135,7 +135,7 @@ const routes = [
         path: 'sermons/:action/:mode/:seriesId?',
         name: 'sermon-flow',
         component: () => import('@/pages/SermonFlowPage.vue'),
-        meta: { hideSidebar: true },
+        meta: { hideSidebar: true, disablePageTransition: true },
       },
       {
         path: 'search',

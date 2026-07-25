@@ -29,6 +29,7 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const hideSidebar = computed(() => route.meta.hideSidebar === true)
+const disablePageTransition = computed(() => route.meta.disablePageTransition === true)
 const LOW_CREDIT_THRESHOLD = 20
 const creditBalance = computed(() => auth.user?.creditBalance ?? 0)
 const showLowCreditNotice = computed(() => !!auth.user && creditBalance.value <= LOW_CREDIT_THRESHOLD)
@@ -351,7 +352,13 @@ onUnmounted(() => {
     <main class="flex-1 overflow-hidden transition-all duration-300 relative">
       <div v-if="showSidebarDragRegion" class="main-drag-region" />
       <router-view v-slot="{ Component }">
+        <component
+          v-if="disablePageTransition"
+          :is="Component"
+          key="sermon-flow"
+        />
         <transition
+          v-else
           name="page-slide"
           mode="out-in"
         >
