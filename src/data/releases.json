@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.1.46",
+    "date": "2026-07-25",
+    "title": "Release version display fix",
+    "changes": [
+      "Settings, Release Notes, and the sign-in version label now stay synchronized with the latest release notes version."
+    ]
+  },
+  {
     "version": "0.1.45",
     "date": "2026-07-25",
     "title": "Sermon writing and workspace improvements",
