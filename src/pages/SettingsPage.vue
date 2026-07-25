@@ -5,10 +5,10 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useConvexQuery } from '@/composables/useConvexQuery'
 import { useConvexMutation } from '@/composables/useConvexMutation'
+import { latestReleaseVersion } from '@/lib/releases'
 
 const router = useRouter()
 const auth = useAuthStore()
-const appVersion = __APP_VERSION__
 
 const countries = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -137,7 +137,7 @@ async function handleDeleteAccount() {
           to="/settings/release-notes"
           class="text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline underline-offset-2"
         >
-          v{{ appVersion }} · Release notes
+          v{{ latestReleaseVersion }} · Release notes
         </RouterLink>
       </div>
 

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, Sparkles } from 'lucide-vue-next'
+import { latestReleaseVersion } from '@/lib/releases'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -15,7 +16,6 @@ const name = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const googleAuthEnabled = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true'
-const appVersion = __APP_VERSION__
 
 const localError = ref('')
 const touched = ref(false)
@@ -390,7 +390,7 @@ function switchMode(newMode: 'signin' | 'signup') {
     </div>
 
     <div class="pointer-events-none absolute bottom-3 left-3 text-[10px] text-muted-foreground/80">
-      v{{ appVersion }}
+      v{{ latestReleaseVersion }}
     </div>
   </div>
 </template>

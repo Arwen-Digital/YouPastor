@@ -3,9 +3,9 @@ import { computed } from 'vue'
 import { ArrowLeft, CalendarDays, Sparkles } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import releases from '@/data/releases.json'
+import { latestReleaseVersion } from '@/lib/releases'
 
 const router = useRouter()
-const appVersion = __APP_VERSION__
 
 const releaseNotes = computed(() => [...releases].sort((a, b) => b.date.localeCompare(a.date)))
 
@@ -36,7 +36,7 @@ function formatReleaseDate(date: string): string {
             <Sparkles class="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">YouPastor v{{ appVersion }}</p>
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">YouPastor v{{ latestReleaseVersion }}</p>
             <h1 class="text-2xl font-semibold tracking-tight text-foreground">Release Notes</h1>
           </div>
         </div>
