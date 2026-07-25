@@ -8,6 +8,7 @@ import { useConvexMutation } from '@/composables/useConvexMutation'
 
 const router = useRouter()
 const auth = useAuthStore()
+const appVersion = __APP_VERSION__
 
 const countries = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -127,9 +128,17 @@ async function handleDeleteAccount() {
 <template>
   <div class="h-full overflow-y-auto">
     <div class="max-w-5xl mx-auto px-4 md:px-6 py-8 space-y-6">
-      <div class="flex items-center gap-3">
-        <Settings class="h-6 w-6 text-muted-foreground" />
-        <h2 class="text-xl font-semibold tracking-tight">Settings</h2>
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <Settings class="h-6 w-6 text-muted-foreground" />
+          <h2 class="text-xl font-semibold tracking-tight">Settings</h2>
+        </div>
+        <RouterLink
+          to="/settings/release-notes"
+          class="text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline underline-offset-2"
+        >
+          v{{ appVersion }} · Release notes
+        </RouterLink>
       </div>
 
       <div class="rounded-xl border bg-card p-5 space-y-4">

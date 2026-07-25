@@ -45,7 +45,9 @@ docker-compose*.yml
 .env.docker.*
 
 # Local scripts
-scripts/
+scripts/*
+!scripts/trigger-release-tag.local.sh
+!scripts/update-release-notes.mjs
 scripts/publish-release.local.sh
 scripts/internal-build-release.sh
 

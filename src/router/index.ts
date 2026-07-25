@@ -153,6 +153,11 @@ const routes = [
         component: () => import('@/pages/SettingsPage.vue'),
       },
       {
+        path: 'settings/release-notes',
+        name: 'release-notes',
+        component: () => import('@/pages/ReleaseNotesPage.vue'),
+      },
+      {
         path: 'feedback',
         name: 'feedback-selector',
         component: () => import('@/pages/FeedbackPage.vue'),
