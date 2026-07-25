@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.1.45",
+    "date": "2026-07-25",
+    "title": "Sermon writing and workspace improvements",
+    "changes": [
+      "Sermon drafts now autosave every five minutes.",
+      "Research and brainstorm resources are shown newest first.",
+      "Improved notebook cards for longer titles and descriptions.",
+      "Added clearer, more compact series actions on the Create Sermon page.",
+      "Added subtle emphasis to the Create a Sermon navigation action.",
+      "Sermon Assist now helps refine pastor-created structure without generating complete sermon outlines.",
+      "Added a Release Notes page in Settings."
+    ]
+  },
+  {
     "version": "0.1.44",
     "date": "2026-07-20",
     "title": "YouPastor workspace",
