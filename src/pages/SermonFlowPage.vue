@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -65,7 +65,22 @@ const contentHtml = ref('')
 
 const { mutate: createSermon, isLoading: createSaving } = useConvexMutation('sermons/mutations:create' as any)
 const { mutate: updateSermon, isLoading: updateSaving } = useConvexMutation('sermons/mutations:update' as any)
-const isSaving = computed(() => createSaving.value || updateSaving.value)
+const saveInProgress = ref(false)
+const isAutosaving = ref(false)
+const isSaving = computed(() => saveInProgress.value || createSaving.value || updateSaving.value)
+
+interface SermonDraftSnapshot {
+  title: string
+  scriptureRef: string
+  content: string
+  seriesId: string
+}
+
+const lastSavedSnapshot = ref<SermonDraftSnapshot | null>(null)
+const lastSaveWasAutosave = ref(false)
+const createdSermonSeriesId = ref<string | undefined>()
+let autosaveTimer: ReturnType<typeof setInterval> | null = null
+const AUTOSAVE_INTERVAL_MS = 5 * 60 * 1000
 
 const editor = useEditor({
   extensions: [
@@ -136,7 +151,7 @@ const editor = useEditor({
 
 const resourceSeriesId = computed(() => {
   if (routeSeriesId.value) return routeSeriesId.value
-  return selectedSermon.value?.seriesId as string | undefined
+  return (selectedSermon.value?.seriesId ?? createdSermonSeriesId.value) as string | undefined
 })
 
 const pageTitle = computed(() => {
@@ -145,9 +160,43 @@ const pageTitle = computed(() => {
   return 'Create Standalone Sermon'
 })
 
+function getDraftSnapshot(): SermonDraftSnapshot {
+  return {
+    title: title.value.trim(),
+    scriptureRef: scriptureRef.value.trim(),
+    content: editor.value?.getHTML() || contentHtml.value || '',
+    seriesId: resourceSeriesId.value ?? '',
+  }
+}
+
+function hasMeaningfulContent(snapshot: SermonDraftSnapshot): boolean {
+  const textContent = snapshot.content
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .trim()
+  return !!snapshot.title || !!snapshot.scriptureRef || !!textContent
+}
+
+function snapshotsMatch(a: SermonDraftSnapshot, b: SermonDraftSnapshot): boolean {
+  return a.title === b.title
+    && a.scriptureRef === b.scriptureRef
+    && a.content === b.content
+    && a.seriesId === b.seriesId
+}
+
+const hasUnsavedChanges = computed(() => {
+  const current = getDraftSnapshot()
+  if (!lastSavedSnapshot.value) return hasMeaningfulContent(current)
+  return !snapshotsMatch(current, lastSavedSnapshot.value)
+})
+
 const saveStatusText = computed(() => {
-  if (isSaving.value) return 'Saving...'
-  if (lastSavedAt.value) return `Saved ${new Date(lastSavedAt.value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+  if (isSaving.value) return isAutosaving.value ? 'Autosaving...' : 'Saving...'
+  if (hasUnsavedChanges.value) return 'Unsaved changes'
+  if (lastSavedAt.value) {
+    const label = lastSaveWasAutosave.value ? 'Autosaved' : 'Saved'
+    return `${label} ${new Date(lastSavedAt.value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+  }
   return 'Not saved yet'
 })
 
@@ -226,6 +275,13 @@ watch(
 )
 
 watch(routeSermonId, (sermonId) => {
+  if (sermonId !== currentSermonId.value) {
+    createdSermonSeriesId.value = undefined
+    lastSavedSnapshot.value = null
+    lastSavedAt.value = null
+    lastSaveWasAutosave.value = false
+  }
+
   selectedSermonUnsub?.()
   selectedSermonUnsub = null
   selectedSermon.value = null
@@ -243,12 +299,26 @@ watch(routeSermonId, (sermonId) => {
 
 watch(selectedSermon, (sermon) => {
   if (!sermon) return
+
+  // Do not overwrite local edits when a realtime update arrives while the
+  // pastor is typing or while a save is still being processed.
+  if (lastSavedSnapshot.value && hasUnsavedChanges.value) return
+
   title.value = sermon.title || ''
   scriptureRef.value = sermon.scriptureRef || ''
   contentHtml.value = sermon.content || ''
   if (editor.value && sermon.content !== editor.value.getHTML()) {
     editor.value.commands.setContent(sermon.content || '')
   }
+  createdSermonSeriesId.value = sermon.seriesId as string | undefined
+  lastSavedSnapshot.value = {
+    title: (sermon.title || '').trim(),
+    scriptureRef: (sermon.scriptureRef || '').trim(),
+    content: sermon.content || '',
+    seriesId: sermon.seriesId ?? '',
+  }
+  lastSavedAt.value = sermon.updatedAt || sermon.createdAt || null
+  lastSaveWasAutosave.value = false
 })
 
 watch(resourceSeriesId, (seriesId) => {
@@ -273,10 +343,10 @@ watch(resourceSeriesId, (seriesId) => {
     seriesLoading.value = false
     if (activeTab.value === 'series') activeTab.value = 'brainstorm'
     brainstormUnsub = client.onUpdate('brainstorm/queries:listMine' as any, {}, (data: any) => {
-      brainstormBriefs.value = (data ?? []).slice(0, 5)
+      brainstormBriefs.value = sortByCreatedAtDesc(data ?? []).slice(0, 5)
     })
     researchUnsub = client.onUpdate('research/queries:listMine' as any, {}, (data: any) => {
-      researchNotes.value = (data ?? []).slice(0, 5)
+      researchNotes.value = sortByCreatedAtDesc(data ?? []).slice(0, 5)
     })
     return
   }
@@ -287,17 +357,25 @@ watch(resourceSeriesId, (seriesId) => {
     seriesLoading.value = false
   })
   brainstormUnsub = client.onUpdate('brainstorm/queries:getBySeriesId' as any, { seriesId }, (data: any) => {
-    brainstormBriefs.value = data ?? []
+    brainstormBriefs.value = sortByCreatedAtDesc(data ?? [])
   })
   researchUnsub = client.onUpdate('research/queries:getBySeriesId' as any, { seriesId }, (data: any) => {
-    researchNotes.value = data ?? []
+    researchNotes.value = sortByCreatedAtDesc(data ?? [])
   })
   seriesSermonsUnsub = client.onUpdate('sermons/queries:getBySeriesId' as any, { seriesId }, (data: any) => {
     seriesSermons.value = data ?? []
   })
 }, { immediate: true })
 
+onMounted(() => {
+  autosaveTimer = setInterval(() => {
+    void handleSave(true)
+  }, AUTOSAVE_INTERVAL_MS)
+})
+
 onBeforeUnmount(() => {
+  if (autosaveTimer) clearInterval(autosaveTimer)
+  autosaveTimer = null
   selectedSermonUnsub?.()
   seriesUnsub?.()
   brainstormUnsub?.()
@@ -336,6 +414,10 @@ function formatDate(timestamp?: number): string {
   })
 }
 
+function sortByCreatedAtDesc<T extends { createdAt?: number }>(items: T[]): T[] {
+  return [...items].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+}
+
 function setHeading(level: 1 | 2 | 3) {
   editor.value?.chain().focus().toggleHeading({ level }).run()
 }
@@ -360,13 +442,27 @@ function openSermon(sermon: any) {
   router.push(`/sermons/edit/sermon/${sermon._id}`)
 }
 
-async function handleSave() {
+async function handleSave(isAutomatic = false): Promise<boolean> {
+  if (saveInProgress.value) return false
+
+  const snapshot = getDraftSnapshot()
+  if (isAutomatic && (!hasMeaningfulContent(snapshot) || !hasUnsavedChanges.value)) {
+    return false
+  }
+  if (!currentSermonId.value && !hasMeaningfulContent(snapshot)) {
+    saveError.value = 'Add a title, scripture reference, or sermon content before saving.'
+    return false
+  }
+
+  saveInProgress.value = true
+  isAutosaving.value = isAutomatic
   saveError.value = null
+
   const payload = {
-    title: title.value,
-    scriptureRef: scriptureRef.value || undefined,
-    content: editor.value?.getHTML() || contentHtml.value || '',
-    seriesId: resourceSeriesId.value as any,
+    title: snapshot.title,
+    scriptureRef: snapshot.scriptureRef || undefined,
+    content: snapshot.content,
+    seriesId: snapshot.seriesId || undefined,
     status: 'draft' as const,
   }
 
@@ -378,15 +474,26 @@ async function handleSave() {
       const result = await createSermon(payload as any)
       if (!result) throw new Error('Save failed')
       currentSermonId.value = result as string
+      createdSermonSeriesId.value = snapshot.seriesId || undefined
+      await router.replace(`/sermons/edit/sermon/${result}`)
     }
+
+    lastSavedSnapshot.value = snapshot
     lastSavedAt.value = Date.now()
+    lastSaveWasAutosave.value = isAutomatic
     posthog.capture('sermon_saved', {
       action: action.value,
-      has_series: !!resourceSeriesId.value,
+      autosave: isAutomatic,
+      has_series: !!payload.seriesId,
       has_scripture: !!payload.scriptureRef,
     })
+    return true
   } catch (err: any) {
     saveError.value = err?.message || 'Unable to save sermon.'
+    return false
+  } finally {
+    saveInProgress.value = false
+    isAutosaving.value = false
   }
 }
 </script>
@@ -449,7 +556,7 @@ async function handleSave() {
               Show Sermon
             </button>
             <button
-              @click="handleSave"
+              @click="handleSave()"
               :disabled="isSaving"
               class="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-500 shadow-sm ring-1 ring-violet-700/20 transition-colors disabled:opacity-50"
             >
