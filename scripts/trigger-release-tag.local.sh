@@ -74,7 +74,7 @@ else
 fi
 
 git commit -m "Release v$NEXT_VERSION"
-git tag "v$NEXT_VERSION"
+git tag -a "v$NEXT_VERSION" -m "Release v$NEXT_VERSION"
 
 echo "Pushing commit and tag..."
 git push --follow-tags
