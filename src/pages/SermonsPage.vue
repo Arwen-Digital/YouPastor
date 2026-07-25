@@ -72,10 +72,30 @@ function stripHtml(html: string): string {
       <div class="grid gap-8 md:grid-cols-12">
         <!-- Left Column: Series -->
         <div class="md:col-span-7 space-y-4">
-          <h2 class="text-lg font-medium text-foreground flex items-center gap-2">
-            <Layers class="h-5 w-5 text-muted-foreground" />
-            Create from Series
-          </h2>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-lg font-medium text-foreground flex items-center gap-2">
+              <Layers class="h-5 w-5 text-muted-foreground" />
+              Create from Series
+            </h2>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                @click="goPlanSeries"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+              >
+                <Layers class="h-3.5 w-3.5" />
+                Plan a series
+              </button>
+              <button
+                type="button"
+                @click="goCreateSeriesQuick"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              >
+                <Plus class="h-3.5 w-3.5" />
+                New series
+              </button>
+            </div>
+          </div>
 
           <div class="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
             <div v-if="seriesLoading" class="p-8 flex flex-col items-center justify-center text-muted-foreground space-y-3">
@@ -114,30 +134,6 @@ function stripHtml(html: string): string {
               </div>
               No sermon series found yet.<br/>Create a series from the Series Planner first.
             </div>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <button
-              @click="goPlanSeries"
-              class="w-full flex items-center justify-between p-4 rounded-2xl border border-border bg-card/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 transition-all group"
-            >
-              <div class="text-left">
-                <div class="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Plan a Series</div>
-                <div class="text-xs text-muted-foreground mt-0.5">Open Series Planner</div>
-              </div>
-              <ChevronRight class="h-4 w-4 text-primary/70 group-hover:text-primary transition-colors" />
-            </button>
-
-            <button
-              @click="goCreateSeriesQuick"
-              class="w-full flex items-center justify-between p-4 rounded-2xl border border-border bg-card/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 transition-all group"
-            >
-              <div class="text-left">
-                <div class="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Create a new series</div>
-                <div class="text-xs text-muted-foreground mt-0.5">Quick create with title and tagline</div>
-              </div>
-              <ChevronRight class="h-4 w-4 text-primary/70 group-hover:text-primary transition-colors" />
-            </button>
           </div>
 
           <!-- Standalone Sermon Button -->
