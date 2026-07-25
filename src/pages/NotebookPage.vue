@@ -1473,10 +1473,10 @@ const filteredList = computed(() => {
               : item.type === 'announcementScript' ? `/notebook/announcement/${item.id}`
               : `/notebook/church-letter/${item.id}`
             )"
-            class="group flex min-h-[190px] w-full flex-col justify-between rounded-2xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+            class="group flex min-h-[190px] w-full flex-col rounded-2xl border border-border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
           >
-            <div class="shrink-0">
-              <div :class="['h-10 w-10 rounded-lg flex items-center justify-center', getTypeBadge(item.type).color]">
+            <div class="flex shrink-0 items-start justify-between gap-3">
+              <div :class="['h-10 w-10 shrink-0 rounded-lg flex items-center justify-center', getTypeBadge(item.type).color]">
                 <BookOpen v-if="item.type === 'sermon' || item.type === 'series'" class="h-5 w-5" />
                 <Search v-else-if="item.type === 'research'" class="h-5 w-5" />
                 <CalendarDays v-else-if="item.type === 'agenda'" class="h-5 w-5" />
@@ -1491,21 +1491,19 @@ const filteredList = computed(() => {
                 <svg v-else-if="item.type === 'churchLetter'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
               </div>
-            </div>
-            <div class="flex w-full min-w-0 flex-1 flex-col justify-end pt-6">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <h3 class="truncate text-lg font-semibold leading-snug text-foreground">{{ item.title }}</h3>
-                  <p v-if="item.subtitle" class="mt-1 truncate text-sm text-muted-foreground">{{ item.subtitle }}</p>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', getTypeBadge(item.type).color]">
-                    {{ getTypeBadge(item.type).label }}
-                  </span>
-                  <ChevronRight class="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
-                </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', getTypeBadge(item.type).color]">
+                  {{ getTypeBadge(item.type).label }}
+                </span>
+                <ChevronRight class="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
               </div>
-              <div class="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+            </div>
+            <div class="flex w-full min-w-0 flex-1 flex-col justify-end pt-7">
+              <div class="min-w-0 space-y-1.5">
+                <h3 class="line-clamp-2 text-lg font-semibold leading-snug text-foreground">{{ item.title }}</h3>
+                <p v-if="item.subtitle" class="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{{ item.subtitle }}</p>
+              </div>
+              <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
                 <span v-if="item.date" class="shrink-0">{{ formatDate(item.date) }}</span>
                 <span
                   v-if="getStatusLabel(item.status)"
