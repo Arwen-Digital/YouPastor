@@ -1142,6 +1142,17 @@ async function downloadSeriesPdf() {
       y += gapAfter
     }
 
+    const measureWrappedLines = (value: string, size: number, bold = false, width = maxWidth) => {
+      const previousFont = pdf.getFont()
+      const previousFontSize = pdf.getFontSize()
+      pdf.setFont('helvetica', bold ? 'bold' : 'normal')
+      pdf.setFontSize(size)
+      const lines = pdf.splitTextToSize(value, width)
+      pdf.setFont(previousFont.fontName, previousFont.fontStyle)
+      pdf.setFontSize(previousFontSize)
+      return lines
+    }
+
     const drawSectionHeading = (title: string, firstContent?: string) => {
       const headingLineHeight = Math.max(16, 13 * 1.35)
       const contentLineHeight = 14
@@ -1207,7 +1218,7 @@ async function downloadSeriesPdf() {
           ['Big Idea', week.bigIdea],
           ['Connective Thread', week.connectiveThread],
         ].filter(([, value]) => cleanText(value))
-        const headingLines = pdf.splitTextToSize(weekHeading, maxWidth)
+        const headingLines = measureWrappedLines(weekHeading, 15, true)
         const headingLineHeight = Math.max(16, 15 * 1.35)
         ensureSpace(headingLines.length * headingLineHeight + (weekFields.length ? 14 : 0) + 8)
         drawParagraph(weekHeading, { size: 15, bold: true, gapAfter: 4 })
