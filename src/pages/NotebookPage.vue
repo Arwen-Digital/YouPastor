@@ -228,6 +228,7 @@ const pastoralFilter = ref<'all' | 'devotional' | 'agenda'>('all')
 const deletingId = ref<string | null>(null)
 const exportingResearchPdf = ref(false)
 const exportingBrainstormPdf = ref(false)
+const exportingSeriesPdf = ref(false)
 
 onMounted(async () => {
   try {
@@ -1089,6 +1090,150 @@ async function downloadBrainstormPdf() {
   }
 }
 
+async function downloadSeriesPdf() {
+  const detail = seriesDetail.value
+  const series = detail?.series
+  if (!series || exportingSeriesPdf.value) return
+
+  exportingSeriesPdf.value = true
+  try {
+    const { jsPDF } = await import('jspdf')
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 48
+    const maxWidth = pageWidth - margin * 2
+    const contentBottom = pageHeight - margin
+    let y = margin
+
+    const cleanText = (value: unknown): string => String(value ?? '').trim()
+
+    const ensureSpace = (heightNeeded: number) => {
+      if (y + heightNeeded > contentBottom) {
+        pdf.addPage()
+        y = margin
+      }
+    }
+
+    const drawParagraph = (value: unknown, options?: { size?: number; bold?: boolean; indent?: number; gapAfter?: number }) => {
+      const text = cleanText(value)
+      if (!text) return
+
+      const size = options?.size ?? 11
+      const indent = options?.indent ?? 0
+      const gapAfter = options?.gapAfter ?? 6
+      const x = margin + indent
+      const width = maxWidth - indent
+      const lineHeight = Math.max(14, size * 1.35)
+      const logicalLines = text.replace(/\r\n/g, '\n').split('\n')
+
+      pdf.setFont('helvetica', options?.bold ? 'bold' : 'normal')
+      pdf.setFontSize(size)
+
+      for (const logicalLine of logicalLines) {
+        const lines = pdf.splitTextToSize(logicalLine || ' ', width)
+        for (const line of lines) {
+          ensureSpace(lineHeight)
+          pdf.text(line, x, y)
+          y += lineHeight
+        }
+      }
+
+      y += gapAfter
+    }
+
+    const drawSectionHeading = (title: string, firstContent?: string) => {
+      const headingLineHeight = Math.max(16, 13 * 1.35)
+      const contentLineHeight = 14
+      ensureSpace(headingLineHeight + (firstContent ? contentLineHeight : 0) + 4)
+      drawParagraph(title, { size: 13, bold: true, gapAfter: 5 })
+    }
+
+    const drawField = (label: string, value: unknown) => {
+      if (!cleanText(value)) return
+      drawParagraph(`${label}: ${cleanText(value)}`, { size: 10.5, indent: 8, gapAfter: 4 })
+    }
+
+    const title = cleanText(series.title) || 'Series Planner'
+    drawParagraph(title, { size: 20, bold: true, gapAfter: 6 })
+
+    if (cleanText(series.tagline)) {
+      drawParagraph(series.tagline, { size: 12, gapAfter: 8 })
+    }
+
+    const status = getStatusLabel(series.status) || cleanText(series.status)
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (character: string) => character.toUpperCase())
+    const meta = [
+      series.createdAt ? `Created ${formatDate(series.createdAt)}` : '',
+      status ? `Status: ${status}` : '',
+    ].filter(Boolean).join(' • ')
+
+    if (meta) drawParagraph(meta, { size: 10, gapAfter: 10 })
+
+    if (cleanText(series.description)) {
+      drawSectionHeading('Description', cleanText(series.description))
+      drawParagraph(series.description, { gapAfter: 8 })
+    }
+
+    if (cleanText(series.seriesArc)) {
+      drawSectionHeading('Series Arc', cleanText(series.seriesArc))
+      drawParagraph(series.seriesArc, { gapAfter: 8 })
+    }
+
+    const planningNotes = [
+      ['Scope Assessment', series.scopeAssessment],
+      ['Duration Check', series.durationCheck],
+      ['Special Attention', series.specialAttention],
+      ['Launch Recommendation', series.launchRecommendation],
+    ].filter(([, value]) => cleanText(value))
+
+    if (planningNotes.length) {
+      drawSectionHeading('Planning Notes', `${planningNotes[0][0]}: ${cleanText(planningNotes[0][1])}`)
+      for (const [label, value] of planningNotes) {
+        drawField(label, value)
+      }
+      y += 4
+    }
+
+    const weeks = Array.isArray(detail.weeks) ? detail.weeks : []
+    if (weeks.length) {
+      drawSectionHeading('Weekly Breakdown', `Week ${weeks[0].weekNumber ?? ''}`)
+      for (const week of weeks) {
+        const sermonTitle = cleanText(week.sermonTitle)
+        const weekHeading = `Week ${week.weekNumber ?? ''}${sermonTitle ? `: ${sermonTitle}` : ''}`
+        const weekFields = [
+          ['Scripture', week.scriptureRef],
+          ['Big Idea', week.bigIdea],
+          ['Connective Thread', week.connectiveThread],
+        ].filter(([, value]) => cleanText(value))
+        const headingLines = pdf.splitTextToSize(weekHeading, maxWidth)
+        const headingLineHeight = Math.max(16, 15 * 1.35)
+        ensureSpace(headingLines.length * headingLineHeight + (weekFields.length ? 14 : 0) + 8)
+        drawParagraph(weekHeading, { size: 15, bold: true, gapAfter: 4 })
+        for (const [label, value] of weekFields) {
+          drawField(label, value)
+        }
+        y += 8
+      }
+    }
+
+    ensureSpace(30)
+    pdf.setDrawColor(220, 220, 220)
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 12
+    drawParagraph('Generated through YouPastor (https://youpastor.com)', { size: 10, gapAfter: 0 })
+
+    const datePart = new Date().toISOString().slice(0, 10)
+    const filename = `series-${slugifyFilePart(title)}-${datePart}.pdf`
+    pdf.save(filename)
+  } catch (err) {
+    console.error('Failed to generate series PDF:', err)
+  } finally {
+    exportingSeriesPdf.value = false
+  }
+}
+
 function getStatusColor(status: string | undefined): string {
   switch (status) {
     case 'active': return 'bg-green-100 text-green-700'
@@ -1540,6 +1685,16 @@ const filteredList = computed(() => {
               <p v-if="seriesDetail.series.tagline" class="text-sm text-muted-foreground">{{ seriesDetail.series.tagline }}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="downloadSeriesPdf"
+                :disabled="exportingSeriesPdf"
+                title="Download PDF"
+                aria-label="Download PDF"
+                class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <Loader2 v-if="exportingSeriesPdf" class="h-3.5 w-3.5 animate-spin" />
+                <Download v-else class="h-3.5 w-3.5" />
+              </button>
               <button
                 @click="handleDelete('series', seriesDetail.series._id)"
                 :disabled="deletingId === seriesDetail.series._id"
