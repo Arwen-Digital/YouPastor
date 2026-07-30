@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch, computed } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Send, ArrowLeft, Loader2, BookOpen, Copy, Check } from 'lucide-vue-next'
 import { marked } from 'marked'
 import { useAI } from '@/composables/useAI'
 import { useAuthStore } from '@/stores/auth'
 import { buildSystemPrompt, buildContextBlock, type ChurchContext } from '@/lib/skills'
+import { getConvexClient } from '@/lib/convex'
 import { useConvexQuery } from '@/composables/useConvexQuery'
+import { useConvexMutation } from '@/composables/useConvexMutation'
 import { useSaveSeries } from '@/composables/useSaveSeries'
 import posthog from 'posthog-js'
 import { useSaveResearch } from '@/composables/useSaveResearch'
@@ -136,6 +138,7 @@ const props = defineProps<{
   title: string
   subtitle: string
   initialMessage: string
+  sermonId?: string
   aiRole?: 'orchestrator' | 'generator' | 'researcher'
   embedded?: boolean
 }>()
@@ -355,6 +358,12 @@ const selectedBlogContext = ref('')
 const selectedBlogId = ref<string | null>(null)
 const hasStartedConversation = ref(false)
 const copiedIndex = ref<number | null>(null)
+const assistSessionRestored = ref(false)
+const { mutate: saveAssistSession, isLoading: assistSessionSaving } = useConvexMutation('sermonAssist/mutations:save' as any)
+let assistSaveTimer: ReturnType<typeof setTimeout> | null = null
+let assistRestorePromise: Promise<void> = Promise.resolve()
+let assistSessionId: string | null = null
+let assistComponentMounted = false
 
 function copyToClipboard(text: string, index: number) {
   navigator.clipboard.writeText(text).then(() => {
@@ -368,6 +377,92 @@ function copyToClipboard(text: string, index: number) {
     console.error('Failed to copy text: ', err)
   })
 }
+
+function getAssistSessionMessages(source: ChatMessage[] = messages.value) {
+  return source.slice(-50).map((message) => ({
+    role: message.role,
+    content: message.content,
+    model: message.model,
+    citations: message.citations,
+  }))
+}
+
+async function persistAssistSessionFor(sermonId: string, source: ChatMessage[]) {
+  if (!isSermonCompanion || !source.length || assistSessionSaving.value) return
+
+  const result = await saveAssistSession({
+    sermonId: sermonId as any,
+    messages: getAssistSessionMessages(source),
+  } as any)
+
+  if (!result) {
+    console.warn('[sermon-assist] Failed to save session')
+  }
+}
+
+async function persistAssistSession() {
+  if (!isSermonCompanion || !props.sermonId || !messages.value.length) return
+  if (assistSessionSaving.value) {
+    scheduleAssistSessionSave()
+    return
+  }
+
+  await persistAssistSessionFor(props.sermonId, messages.value)
+}
+
+function scheduleAssistSessionSave() {
+  if (!isSermonCompanion || !props.sermonId || !messages.value.length) return
+
+  if (assistSaveTimer) clearTimeout(assistSaveTimer)
+  assistSaveTimer = setTimeout(() => {
+    assistSaveTimer = null
+    void persistAssistSession()
+  }, 500)
+}
+
+async function restoreAssistSession(sermonId?: string) {
+  if (!isSermonCompanion || !sermonId) return
+
+  if (assistSessionId && assistSessionId !== sermonId) {
+    if (assistSaveTimer) clearTimeout(assistSaveTimer)
+    assistSaveTimer = null
+    await persistAssistSessionFor(assistSessionId, messages.value)
+    messages.value = []
+    hasStartedConversation.value = false
+    assistSessionRestored.value = false
+  }
+  assistSessionId = sermonId
+
+  const hadConversation = messages.value.length > 0
+  try {
+    const client = getConvexClient()
+    const session = await client.query('sermonAssist/queries:getBySermonId' as any, {
+      sermonId,
+    }) as any
+
+    if (session?.messages?.length) {
+      messages.value = session.messages as ChatMessage[]
+      hasStartedConversation.value = true
+      assistSessionRestored.value = true
+      return
+    }
+
+    if (hadConversation) scheduleAssistSessionSave()
+  } catch (err) {
+    console.warn('[sermon-assist] Failed to restore session', err)
+  }
+}
+
+watch(() => props.sermonId, (sermonId) => {
+  if (!isSermonCompanion) return
+
+  assistRestorePromise = restoreAssistSession(sermonId)
+  if (assistComponentMounted) {
+    void assistRestorePromise.then(() => {
+      if (!messages.value.length) void startConversation(props.initialMessage)
+    })
+  }
+}, { immediate: true })
 
 // Load church profile from Convex
 const { result: churchProfile } = useConvexQuery('profile/queries:getMine' as any)
@@ -803,6 +898,8 @@ async function handleAssistantResponse(responseContent: string, model?: string, 
       currentSystemPrompt.value = baseSystemPrompt.value
     }
   }
+
+  scheduleAssistSessionSave()
 }
 
 async function startConversation(userMessage: string) {
@@ -810,6 +907,7 @@ async function startConversation(userMessage: string) {
 
   hasStartedConversation.value = true
   messages.value.push({ role: 'user', content: userMessage })
+  scheduleAssistSessionSave()
   scrollToBottom()
 
   const result = await sendMessage(buildChatHistory(), {
@@ -821,6 +919,7 @@ async function startConversation(userMessage: string) {
     await handleAssistantResponse(result.content, result.model, result.citations)
   }
 
+  scheduleAssistSessionSave()
   scrollToBottom()
 }
 
@@ -874,8 +973,23 @@ async function handleStartWithoutSavedSource() {
 }
 
 onMounted(async () => {
+  assistComponentMounted = true
   if (isSermonResearch || isSermonToBlog || isSermonToYoutube || isSmallGroupQuestions || isChurchSocialPost) return
+
+  if (isSermonCompanion) {
+    await assistRestorePromise
+    if (!messages.value.length) await startConversation(props.initialMessage)
+    return
+  }
+
   await startConversation(props.initialMessage)
+})
+
+onUnmounted(() => {
+  assistComponentMounted = false
+  if (assistSaveTimer) clearTimeout(assistSaveTimer)
+  assistSaveTimer = null
+  if (props.sermonId) void persistAssistSessionFor(props.sermonId, messages.value)
 })
 
 /** Switch from orchestrator intake to researcher model and trigger research generation */
@@ -979,6 +1093,7 @@ async function handleSend() {
   userInput.value = ''
   hasStartedConversation.value = true
   messages.value.push({ role: 'user', content: text })
+  scheduleAssistSessionSave()
   scrollToBottom()
 
   posthog.capture('skill_used', { skill_slug: props.skillSlug, skill_title: props.title })
@@ -992,6 +1107,7 @@ async function handleSend() {
     await handleAssistantResponse(streamingContent.value, lastModel.value, lastCitations.value)
   }
 
+  scheduleAssistSessionSave()
   scrollToBottom()
 }
 
@@ -1245,6 +1361,13 @@ function handleSaveModalClose() {
     </div>
 
     <div ref="messagesContainer" class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div
+        v-if="isSermonCompanion && assistSessionRestored"
+        class="mx-auto max-w-3xl rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-xs text-muted-foreground"
+      >
+        Previous Sermon Assist session restored.
+      </div>
+
       <div v-if="showSourceChooser" class="max-w-3xl mx-auto rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
         <template v-if="isSermonResearch">
           <div class="space-y-1">

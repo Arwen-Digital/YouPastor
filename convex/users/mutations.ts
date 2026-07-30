@@ -62,6 +62,7 @@ export const deleteMyAccount = mutation({
     const userTables: string[] = [
       "brevoContacts",
       "churchProfiles",
+      "sermonAssistSessions",
       "aiUsage",
       "creditLedger",
       "subscriptions",

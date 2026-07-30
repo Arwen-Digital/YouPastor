@@ -141,6 +141,20 @@ export default defineSchema({
     .index("by_user_created", ["userId", "createdAt"])
     .index("by_series", ["seriesId"]),
 
+  sermonAssistSessions: defineTable({
+    userId: v.id("users"),
+    sermonId: v.id("sermons"),
+    messages: v.array(v.object({
+      role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+      content: v.string(),
+      model: v.optional(v.string()),
+      citations: v.optional(v.array(v.string())),
+    })),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_sermon", ["sermonId"]),
+
   // Sermon series — saved from the Series Planner skill
   series: defineTable({
     userId: v.id("users"),

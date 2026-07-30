@@ -229,6 +229,7 @@ const deletingId = ref<string | null>(null)
 const exportingResearchPdf = ref(false)
 const exportingBrainstormPdf = ref(false)
 const exportingSeriesPdf = ref(false)
+const exportingBlogPdf = ref(false)
 
 onMounted(async () => {
   try {
@@ -1087,6 +1088,181 @@ async function downloadBrainstormPdf() {
     console.error('Failed to generate brainstorm PDF:', err)
   } finally {
     exportingBrainstormPdf.value = false
+  }
+}
+
+async function downloadBlogPdf() {
+  if (!blogDetail.value || !blogDetail.value.content || exportingBlogPdf.value) return
+
+  exportingBlogPdf.value = true
+  try {
+    const { jsPDF } = await import('jspdf')
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 48
+    const maxWidth = pageWidth - margin * 2
+    let y = margin
+
+    const ensureSpace = (heightNeeded: number) => {
+      if (y + heightNeeded > pageHeight - margin) {
+        pdf.addPage()
+        y = margin
+      }
+    }
+
+    const cleanInline = (line: string): string => line
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '[image]')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+      .replace(/`([^`]+)`/g, '$1')
+      .trim()
+
+    const drawText = (text: string, options?: { size?: number; bold?: boolean; gapAfter?: number }) => {
+      const size = options?.size ?? 11
+      const gapAfter = options?.gapAfter ?? 6
+      const lines = pdf.splitTextToSize(cleanInline(text), maxWidth)
+      const lineHeight = Math.max(14, size * 1.35)
+      const blockHeight = lines.length * lineHeight
+
+      ensureSpace(blockHeight)
+      pdf.setFont('helvetica', options?.bold ? 'bold' : 'normal')
+      pdf.setFontSize(size)
+      pdf.text(lines, margin, y)
+      y += blockHeight + gapAfter
+    }
+
+    const drawRichLine = (line: string, options?: { size?: number; gapAfter?: number; indent?: number }) => {
+      const size = options?.size ?? 11
+      const gapAfter = options?.gapAfter ?? 5
+      const indent = options?.indent ?? 0
+      const lineHeight = Math.max(14, size * 1.35)
+      const maxX = margin + maxWidth
+      let x = margin + indent
+      const normalized = cleanInline(line)
+      const segments = normalized
+        .split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g)
+        .filter(Boolean)
+        .map((segment) => {
+          const isBold = /^\*\*[^*]+\*\*$/.test(segment) || /^__[^_]+__$/.test(segment)
+          const isItalic = /^\*[^*]+\*$/.test(segment) || /^_[^_]+_$/.test(segment)
+          const text = isBold ? segment.slice(2, -2) : isItalic ? segment.slice(1, -1) : segment
+          return { text, isBold, isItalic }
+        })
+
+      ensureSpace(lineHeight)
+      pdf.setFontSize(size)
+
+      for (const segment of segments) {
+        const words = segment.text.split(/(\s+)/)
+        const fontStyle = segment.isBold
+          ? (segment.isItalic ? 'bolditalic' : 'bold')
+          : (segment.isItalic ? 'italic' : 'normal')
+        pdf.setFont('helvetica', fontStyle)
+
+        for (const token of words) {
+          if (!token) continue
+          const width = pdf.getTextWidth(token)
+          if (x + width > maxX && token.trim()) {
+            y += lineHeight
+            ensureSpace(lineHeight)
+            x = margin + indent
+          }
+          pdf.text(token, x, y)
+          x += width
+        }
+      }
+
+      y += lineHeight + gapAfter
+    }
+
+    const title = blogDetail.value.title || 'Blog Post'
+    drawText(title, { size: 20, bold: true, gapAfter: 8 })
+
+    const meta = [
+      blogDetail.value.createdAt ? `Created ${formatDate(blogDetail.value.createdAt)}` : '',
+      blogDetail.value.updatedAt && blogDetail.value.updatedAt !== blogDetail.value.createdAt
+        ? `Updated ${formatDate(blogDetail.value.updatedAt)}`
+        : '',
+    ].filter(Boolean).join(' • ')
+
+    if (meta) drawText(meta, { size: 10, gapAfter: 10 })
+
+    ensureSpace(12)
+    pdf.setDrawColor(220, 220, 220)
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 16
+
+    const lines = String(blogDetail.value.content).replace(/\r\n/g, '\n').split('\n')
+    let inCodeBlock = false
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? ''
+      const trimmed = line.trim()
+
+      if (/^```/.test(trimmed)) {
+        inCodeBlock = !inCodeBlock
+        continue
+      }
+      if (inCodeBlock) {
+        drawText(line || ' ', { size: 10, gapAfter: 2 })
+        continue
+      }
+      if (!trimmed) {
+        y += 4
+        continue
+      }
+      if (/^\s*(---|___|\*\*\*)\s*$/.test(trimmed)) {
+        ensureSpace(12)
+        pdf.setDrawColor(220, 220, 220)
+        pdf.line(margin, y, pageWidth - margin, y)
+        y += 12
+        continue
+      }
+
+      const heading = line.match(/^(#{1,6})\s+(.+)$/)
+      if (heading) {
+        const level = heading[1].length
+        const sizeByLevel = [0, 17, 15, 14, 13, 12, 11]
+        ensureSpace(42)
+        drawText(heading[2], { size: sizeByLevel[level] || 11, bold: true, gapAfter: 6 })
+        continue
+      }
+
+      const quote = line.match(/^>\s+(.+)$/)
+      if (quote) {
+        drawRichLine(`"${quote[1]}"`, { indent: 10, gapAfter: 6 })
+        continue
+      }
+
+      const ordered = line.match(/^\s*\d+\.\s+(.+)$/)
+      if (ordered) {
+        drawRichLine(line.trim(), { indent: 12, gapAfter: 4 })
+        continue
+      }
+
+      const bullet = line.match(/^\s*[-*+]\s+(.+)$/)
+      if (bullet) {
+        drawRichLine(`• ${bullet[1]}`, { indent: 12, gapAfter: 4 })
+        continue
+      }
+
+      drawRichLine(line)
+    }
+
+    y += 8
+    ensureSpace(18)
+    pdf.setDrawColor(220, 220, 220)
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 12
+    drawText('Generated through YouPastor (https://youpastor.com)', { size: 10, gapAfter: 0 })
+
+    const datePart = new Date().toISOString().slice(0, 10)
+    const filename = `blog-${slugifyFilePart(title)}-${datePart}.pdf`
+    pdf.save(filename)
+  } catch (err) {
+    console.error('Failed to generate blog PDF:', err)
+  } finally {
+    exportingBlogPdf.value = false
   }
 }
 
@@ -2090,6 +2266,16 @@ const filteredList = computed(() => {
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="downloadBlogPdf"
+                :disabled="!blogDetail.content || exportingBlogPdf"
+                title="Download PDF"
+                aria-label="Download PDF"
+                class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <Loader2 v-if="exportingBlogPdf" class="h-3.5 w-3.5 animate-spin" />
+                <Download v-else class="h-3.5 w-3.5" />
+              </button>
               <button
                 @click="handleDelete('blog', blogDetail._id)"
                 :disabled="deletingId === blogDetail._id"

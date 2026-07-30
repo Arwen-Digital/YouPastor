@@ -785,6 +785,7 @@ async function handleSave(isAutomatic = false): Promise<boolean> {
                   title="Sermon Assist"
                   subtitle="Conversational help while you write"
                   initialMessage="I'm writing my sermon and want focused help as I go."
+                  :sermon-id="currentSermonId"
                   aiRole="generator"
                   :embedded="true"
                 />
